@@ -1,0 +1,21 @@
+{
+  "signals": [
+    {
+      "id": "runtime-story-publish-500",
+      "severity": "error",
+      "source": "runtime",
+      "message": "POST /api/story/publish returned 500",
+      "edge": {
+        "source": { "path": "src/app/story/page.tsx" },
+        "target": { "path": "src/app/api/story/publish/route.ts" }
+      }
+    },
+    {
+      "id": "typescript-billing",
+      "severity": "warning",
+      "source": "typescript",
+      "message": "Billing service has a type warning",
+      "node": { "path": "src/services/billing.ts" }
+    }
+  ]
+}
