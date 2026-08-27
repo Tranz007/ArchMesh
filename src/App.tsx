@@ -9,15 +9,24 @@ import {
   CircleDot,
   Code2,
   Database,
+  GitBranch,
   Network,
   Search,
   XCircle,
 } from 'lucide-react';
 import { GraphCanvas } from './GraphCanvas';
 import { projectArchitecture } from './projections/architecture';
+import { projectChanges } from './projections/changes';
 import { projectTopology } from './projections/topology';
 import { sampleGraph } from './sample-graph';
-import type { ArchEdge, ArchGraphData, ArchNode, GraphMetadata, HealthState } from './types';
+import type {
+  ArchEdge,
+  ArchGraphData,
+  ArchNode,
+  ChangeState,
+  GraphMetadata,
+  HealthState,
+} from './types';
 
 const healthLabel: Record<HealthState, string> = {
   healthy: 'Healthy',
@@ -27,7 +36,13 @@ const healthLabel: Record<HealthState, string> = {
   unknown: 'Unknown',
 };
 
-type ViewMode = 'architecture' | 'topology' | 'code';
+const changeLabel: Record<ChangeState, string> = {
+  unchanged: 'Unchanged',
+  changed: 'Changed',
+  affected: 'Affected',
+};
+
+type ViewMode = 'architecture' | 'topology' | 'changes' | 'code';
 
 interface ConnectionListProps {
   title: string;
@@ -53,7 +68,7 @@ function ConnectionList({ title, icon, edges, selectedNodeId, data, onSelect }: 
           const other = data.nodes.find((node) => node.id === otherId);
           return (
             <button key={edge.id} type="button" onClick={() => onSelect(otherId)}>
-              <span className={`edge-state ${edge.health}`} />
+              <span className={`edge-state ${edge.health} change-${edge.change ?? 'unchanged'}`} />
               <span className="connection-copy">
                 <strong>{other?.label ?? otherId}</strong>
                 <small>{edge.relation}{edge.label ? ` · ${edge.label}` : ''}</small>
@@ -86,6 +101,11 @@ function HealthEvidence({ health, metadata }: { health: HealthState; metadata?: 
       </dl>
     </section>
   );
+}
+
+function ChangeBadge({ change }: { change?: ChangeState }) {
+  if (!change || change === 'unchanged') return null;
+  return <div className={`change-badge ${change}`}>{changeLabel[change]}</div>;
 }
 
 export default function App() {
@@ -121,13 +141,15 @@ export default function App() {
     [data, focusedFeatureId],
   );
   const topologyProjection = useMemo(() => projectTopology(data), [data]);
+  const changesProjection = useMemo(() => projectChanges(data), [data]);
 
   const visibleData = useMemo(() => {
     if (source === 'demo') return data;
     if (viewMode === 'architecture') return architectureProjection.graph;
     if (viewMode === 'topology') return topologyProjection;
+    if (viewMode === 'changes') return changesProjection;
     return data;
-  }, [architectureProjection.graph, data, source, topologyProjection, viewMode]);
+  }, [architectureProjection.graph, changesProjection, data, source, topologyProjection, viewMode]);
 
   const selectNode = useCallback((nodeId?: string) => {
     setSelectedEdgeId(undefined);
@@ -178,8 +200,20 @@ export default function App() {
   }, [query, visibleData.nodes]);
 
   const counts = useMemo(() => {
-    const result = { healthy: 0, warning: 0, error: 0, impacted: 0, unknown: 0 };
-    for (const node of visibleData.nodes) result[node.health] += 1;
+    const result = {
+      healthy: 0,
+      warning: 0,
+      error: 0,
+      impacted: 0,
+      unknown: 0,
+      changed: 0,
+      affected: 0,
+    };
+    for (const node of visibleData.nodes) {
+      result[node.health] += 1;
+      if (node.change === 'changed') result.changed += 1;
+      if (node.change === 'affected') result.affected += 1;
+    }
     return result;
   }, [visibleData.nodes]);
 
@@ -210,7 +244,9 @@ export default function App() {
     ? 'Find a feature, integration, service…'
     : viewMode === 'topology'
       ? 'Find a feature, collection, integration…'
-      : 'Find a route, component, file…';
+      : viewMode === 'changes'
+        ? 'Find changed or affected code…'
+        : 'Find a route, component, file…';
 
   return (
     <main className="app-shell">
@@ -223,9 +259,18 @@ export default function App() {
           </div>
         </div>
 
-        <div className="status-strip" aria-label="Architecture health summary">
-          <span className="status status-error"><XCircle size={14} /> {counts.error} errors</span>
-          <span className="status status-impact"><AlertTriangle size={14} /> {counts.impacted} impacted</span>
+        <div className="status-strip" aria-label="Architecture status summary">
+          {viewMode === 'changes' && source === 'scan' ? (
+            <>
+              <span className="status status-changed"><GitBranch size={14} /> {counts.changed} changed</span>
+              <span className="status status-affected"><CircleDot size={14} /> {counts.affected} affected</span>
+            </>
+          ) : (
+            <>
+              <span className="status status-error"><XCircle size={14} /> {counts.error} errors</span>
+              <span className="status status-impact"><AlertTriangle size={14} /> {counts.impacted} impacted</span>
+            </>
+          )}
           <span className="status"><CircleDot size={14} /> {visibleData.nodes.length} nodes</span>
         </div>
       </header>
@@ -273,6 +318,13 @@ export default function App() {
               </button>
               <button
                 type="button"
+                className={viewMode === 'changes' ? 'selected' : ''}
+                onClick={() => changeView('changes')}
+              >
+                <GitBranch size={14} /> Changes
+              </button>
+              <button
+                type="button"
                 className={viewMode === 'code' ? 'selected' : ''}
                 onClick={() => changeView('code')}
               >
@@ -280,16 +332,18 @@ export default function App() {
               </button>
             </div>
           )}
-          <button
-            type="button"
-            className={errorsOnly ? 'active' : ''}
-            onClick={() => {
-              setErrorsOnly((value) => !value);
-              clearSelection();
-            }}
-          >
-            Errors only
-          </button>
+          {viewMode !== 'changes' && (
+            <button
+              type="button"
+              className={errorsOnly ? 'active' : ''}
+              onClick={() => {
+                setErrorsOnly((value) => !value);
+                clearSelection();
+              }}
+            >
+              Errors only
+            </button>
+          )}
         </div>
       </section>
 
@@ -318,10 +372,18 @@ export default function App() {
             onSelectNode={selectNode}
             onSelectEdge={selectEdge}
           />
-          <div className="legend" aria-label="Health legend">
-            {(['healthy', 'warning', 'error', 'impacted'] as HealthState[]).map((health) => (
-              <span key={health}><i className={`legend-dot ${health}`} />{healthLabel[health]}</span>
-            ))}
+          <div className="legend" aria-label="Graph legend">
+            {viewMode === 'changes' ? (
+              <>
+                <span><i className="legend-dot changed" />Changed</span>
+                <span><i className="legend-dot affected" />Affected</span>
+                <span><i className="legend-dot error" />Error overrides change color</span>
+              </>
+            ) : (
+              (['healthy', 'warning', 'error', 'impacted'] as HealthState[]).map((health) => (
+                <span key={health}><i className={`legend-dot ${health}`} />{healthLabel[health]}</span>
+              ))
+            )}
           </div>
         </div>
 
@@ -331,6 +393,7 @@ export default function App() {
               <div className="eyebrow">Connection</div>
               <h2>{selectedEdge.label ?? selectedEdge.relation}</h2>
               <div className={`health-badge ${selectedEdge.health}`}>{healthLabel[selectedEdge.health]}</div>
+              <ChangeBadge change={selectedEdge.change} />
 
               <div className="edge-route" aria-label="Connection direction">
                 <button type="button" onClick={() => selectNode(selectedEdge.source)}>
@@ -351,12 +414,18 @@ export default function App() {
                   This connection is in the blast radius of a direct failure. ArchMesh does not have evidence that this connection itself failed.
                 </p>
               )}
+              {selectedEdge.change === 'affected' && (
+                <p className="change-note">
+                  This connection leads toward code that changed. It is structurally affected, not necessarily broken.
+                </p>
+              )}
             </>
           ) : selectedNode ? (
             <>
               <div className="eyebrow">{selectedNode.kind}</div>
               <h2>{selectedNode.label}</h2>
               <div className={`health-badge ${selectedNode.health}`}>{healthLabel[selectedNode.health]}</div>
+              <ChangeBadge change={selectedNode.change} />
               {selectedNode.path && <code className="path">{selectedNode.path}</code>}
 
               <HealthEvidence health={selectedNode.health} metadata={selectedNode.metadata} />
@@ -384,6 +453,16 @@ export default function App() {
               {selectedNode.health === 'impacted' && (
                 <p className="impact-note">
                   This entity depends on a direct failure elsewhere in the graph. Impact is inferred; failure is not confirmed here.
+                </p>
+              )}
+              {selectedNode.change === 'changed' && (
+                <p className="change-note changed">
+                  This source file was changed directly in the selected Git comparison.
+                </p>
+              )}
+              {selectedNode.change === 'affected' && (
+                <p className="change-note">
+                  This entity depends, directly or transitively, on changed code. ArchMesh is showing structural impact, not claiming behavior changed.
                 </p>
               )}
 
@@ -425,16 +504,26 @@ export default function App() {
                   ? 'Explore the system'
                   : viewMode === 'topology'
                     ? 'Explore data and integrations'
-                    : 'Inspect the code graph'}
+                    : viewMode === 'changes'
+                      ? 'Explore change impact'
+                      : 'Inspect the code graph'}
               </h2>
               <p>
                 {viewMode === 'architecture'
                   ? 'Select a feature, integration, or connection to understand the human architecture, then drill into a feature when you need code-level detail.'
                   : viewMode === 'topology'
                     ? 'See which product areas read or write data and which external systems they call. Select a connection to inspect its health and evidence.'
-                    : 'Select a node or connection to isolate exact scanned code relationships and inspect direct failure evidence.'}
+                    : viewMode === 'changes'
+                      ? visibleData.nodes.length > 0
+                        ? 'Blue nodes changed directly. Purple nodes depend on those changes. Health remains a separate signal, so a changed node can still be healthy or failing.'
+                        : 'No changed source is present in this scan. Run ArchMesh with --changes or --changes-from <ref> to populate this view.'
+                      : 'Select a node or connection to isolate exact scanned code relationships and inspect direct failure evidence.'}
               </p>
-              <p className="muted">Red connections are failures. Orange connections represent downstream impact.</p>
+              <p className="muted">
+                {viewMode === 'changes'
+                  ? 'Changed and affected describe source-control impact, not runtime health.'
+                  : 'Red connections are failures. Orange connections represent downstream impact.'}
+              </p>
             </div>
           )}
         </aside>
