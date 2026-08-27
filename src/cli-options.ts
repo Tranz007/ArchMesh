@@ -1,4 +1,5 @@
 import path from 'node:path';
+import type { EditorPreference } from './editor/open-source.js';
 
 export interface CliOptions {
   target: string;
@@ -7,7 +8,10 @@ export interface CliOptions {
   changes: boolean;
   changesFrom?: string;
   watch: boolean;
+  editor: EditorPreference;
 }
+
+const EDITORS = new Set<EditorPreference>(['auto', 'cursor', 'code', 'zed']);
 
 export function parseCliOptions(argv: string[], cwd = process.cwd()): CliOptions {
   let target: string | undefined;
@@ -16,6 +20,7 @@ export function parseCliOptions(argv: string[], cwd = process.cwd()): CliOptions
   let changes = false;
   let changesFrom: string | undefined;
   let watch = false;
+  let editor: EditorPreference = 'auto';
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -32,6 +37,15 @@ export function parseCliOptions(argv: string[], cwd = process.cwd()): CliOptions
 
     if (argument === '--watch') {
       watch = true;
+      continue;
+    }
+
+    if (argument === '--editor') {
+      const value = argv[index + 1] as EditorPreference | undefined;
+      if (!value || value.startsWith('--')) throw new Error('--editor requires auto, cursor, code, or zed.');
+      if (!EDITORS.has(value)) throw new Error(`Unsupported editor: ${value}. Use auto, cursor, code, or zed.`);
+      editor = value;
+      index += 1;
       continue;
     }
 
@@ -67,5 +81,6 @@ export function parseCliOptions(argv: string[], cwd = process.cwd()): CliOptions
     changes,
     changesFrom,
     watch,
+    editor,
   };
 }
