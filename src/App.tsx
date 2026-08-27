@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ArrowDownRight,
   ArrowLeft,
+  ArrowRight,
   ArrowUpLeft,
   Boxes,
   CircleDot,
@@ -16,7 +17,7 @@ import { GraphCanvas } from './GraphCanvas';
 import { projectArchitecture } from './projections/architecture';
 import { projectTopology } from './projections/topology';
 import { sampleGraph } from './sample-graph';
-import type { ArchEdge, ArchGraphData, ArchNode, HealthState } from './types';
+import type { ArchEdge, ArchGraphData, ArchNode, GraphMetadata, HealthState } from './types';
 
 const healthLabel: Record<HealthState, string> = {
   healthy: 'Healthy',
@@ -65,12 +66,35 @@ function ConnectionList({ title, icon, edges, selectedNodeId, data, onSelect }: 
   );
 }
 
+function HealthEvidence({ health, metadata }: { health: HealthState; metadata?: GraphMetadata }) {
+  const message = metadata?.healthMessage;
+  if ((health !== 'error' && health !== 'warning') || typeof message !== 'string') return null;
+
+  const source = metadata?.healthSource;
+  const timestamp = metadata?.healthTimestamp;
+
+  return (
+    <section className={`health-evidence ${health}`}>
+      <div className="health-evidence-title">
+        {health === 'error' ? <XCircle size={14} /> : <AlertTriangle size={14} />}
+        Direct evidence
+      </div>
+      <p>{message}</p>
+      <dl>
+        {source && <div><dt>Source</dt><dd>{String(source)}</dd></div>}
+        {timestamp && <div><dt>Observed</dt><dd>{String(timestamp)}</dd></div>}
+      </dl>
+    </section>
+  );
+}
+
 export default function App() {
   const [data, setData] = useState<ArchGraphData>(sampleGraph);
   const [source, setSource] = useState<'scan' | 'demo'>('demo');
   const [viewMode, setViewMode] = useState<ViewMode>('architecture');
   const [focusedFeatureId, setFocusedFeatureId] = useState<string>();
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
   const [errorsOnly, setErrorsOnly] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -105,12 +129,37 @@ export default function App() {
     return data;
   }, [architectureProjection.graph, data, source, topologyProjection, viewMode]);
 
-  const selectNode = useCallback((nodeId?: string) => setSelectedNodeId(nodeId), []);
+  const selectNode = useCallback((nodeId?: string) => {
+    setSelectedEdgeId(undefined);
+    setSelectedNodeId(nodeId);
+  }, []);
+
+  const selectEdge = useCallback((edgeId?: string) => {
+    setSelectedNodeId(undefined);
+    setSelectedEdgeId(edgeId);
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedNodeId(undefined);
+    setSelectedEdgeId(undefined);
+  }, []);
 
   const selectedNode = useMemo(
     () => visibleData.nodes.find((node) => node.id === selectedNodeId),
     [visibleData.nodes, selectedNodeId],
   );
+
+  const selectedEdge = useMemo(
+    () => visibleData.edges.find((edge) => edge.id === selectedEdgeId),
+    [visibleData.edges, selectedEdgeId],
+  );
+
+  const selectedEdgeSource = selectedEdge
+    ? visibleData.nodes.find((node) => node.id === selectedEdge.source)
+    : undefined;
+  const selectedEdgeTarget = selectedEdge
+    ? visibleData.nodes.find((node) => node.id === selectedEdge.target)
+    : undefined;
 
   const selectedConnections = useMemo(() => {
     if (!selectedNodeId) return { outbound: [], inbound: [] };
@@ -135,13 +184,13 @@ export default function App() {
   }, [visibleData.nodes]);
 
   const chooseSearchResult = (node: ArchNode) => {
-    setSelectedNodeId(node.id);
+    selectNode(node.id);
     setQuery('');
   };
 
   const changeView = (mode: ViewMode) => {
     setViewMode(mode);
-    setSelectedNodeId(undefined);
+    clearSelection();
     setErrorsOnly(false);
     if (mode !== 'architecture') setFocusedFeatureId(undefined);
   };
@@ -236,7 +285,7 @@ export default function App() {
             className={errorsOnly ? 'active' : ''}
             onClick={() => {
               setErrorsOnly((value) => !value);
-              setSelectedNodeId(undefined);
+              clearSelection();
             }}
           >
             Errors only
@@ -250,7 +299,7 @@ export default function App() {
             type="button"
             onClick={() => {
               setFocusedFeatureId(undefined);
-              setSelectedNodeId(undefined);
+              clearSelection();
             }}
           >
             <ArrowLeft size={14} /> System overview
@@ -265,7 +314,9 @@ export default function App() {
             data={visibleData}
             errorsOnly={errorsOnly}
             selectedNodeId={selectedNodeId}
+            selectedEdgeId={selectedEdgeId}
             onSelectNode={selectNode}
+            onSelectEdge={selectEdge}
           />
           <div className="legend" aria-label="Health legend">
             {(['healthy', 'warning', 'error', 'impacted'] as HealthState[]).map((health) => (
@@ -275,12 +326,40 @@ export default function App() {
         </div>
 
         <aside className="inspector">
-          {selectedNode ? (
+          {selectedEdge ? (
+            <>
+              <div className="eyebrow">Connection</div>
+              <h2>{selectedEdge.label ?? selectedEdge.relation}</h2>
+              <div className={`health-badge ${selectedEdge.health}`}>{healthLabel[selectedEdge.health]}</div>
+
+              <div className="edge-route" aria-label="Connection direction">
+                <button type="button" onClick={() => selectNode(selectedEdge.source)}>
+                  <small>{selectedEdgeSource?.kind ?? 'source'}</small>
+                  <strong>{selectedEdgeSource?.label ?? selectedEdge.source}</strong>
+                </button>
+                <span><ArrowRight size={16} /><em>{selectedEdge.relation}</em></span>
+                <button type="button" onClick={() => selectNode(selectedEdge.target)}>
+                  <small>{selectedEdgeTarget?.kind ?? 'target'}</small>
+                  <strong>{selectedEdgeTarget?.label ?? selectedEdge.target}</strong>
+                </button>
+              </div>
+
+              <HealthEvidence health={selectedEdge.health} metadata={selectedEdge.metadata} />
+
+              {selectedEdge.health === 'impacted' && (
+                <p className="impact-note">
+                  This connection is in the blast radius of a direct failure. ArchMesh does not have evidence that this connection itself failed.
+                </p>
+              )}
+            </>
+          ) : selectedNode ? (
             <>
               <div className="eyebrow">{selectedNode.kind}</div>
               <h2>{selectedNode.label}</h2>
               <div className={`health-badge ${selectedNode.health}`}>{healthLabel[selectedNode.health]}</div>
               {selectedNode.path && <code className="path">{selectedNode.path}</code>}
+
+              <HealthEvidence health={selectedNode.health} metadata={selectedNode.metadata} />
 
               {(routePath || httpMethods || serverActionCount || semanticSource || provider || resourceType) && (
                 <dl className="entity-facts">
@@ -302,13 +381,19 @@ export default function App() {
                 </div>
               )}
 
+              {selectedNode.health === 'impacted' && (
+                <p className="impact-note">
+                  This entity depends on a direct failure elsewhere in the graph. Impact is inferred; failure is not confirmed here.
+                </p>
+              )}
+
               {source === 'scan' && viewMode === 'architecture' && selectedNode.kind === 'feature' && !focusedFeatureId && (
                 <button
                   type="button"
                   className="primary-action"
                   onClick={() => {
                     setFocusedFeatureId(selectedNode.id);
-                    setSelectedNodeId(undefined);
+                    clearSelection();
                   }}
                 >
                   Explore this feature
@@ -321,7 +406,7 @@ export default function App() {
                 edges={selectedConnections.outbound}
                 selectedNodeId={selectedNode.id}
                 data={visibleData}
-                onSelect={setSelectedNodeId}
+                onSelect={selectNode}
               />
               <ConnectionList
                 title="Depended on by"
@@ -329,7 +414,7 @@ export default function App() {
                 edges={selectedConnections.inbound}
                 selectedNodeId={selectedNode.id}
                 data={visibleData}
-                onSelect={setSelectedNodeId}
+                onSelect={selectNode}
               />
             </>
           ) : (
@@ -344,10 +429,10 @@ export default function App() {
               </h2>
               <p>
                 {viewMode === 'architecture'
-                  ? 'Select a feature or integration to understand the human architecture, then drill into a feature when you need code-level detail.'
+                  ? 'Select a feature, integration, or connection to understand the human architecture, then drill into a feature when you need code-level detail.'
                   : viewMode === 'topology'
-                    ? 'See which product areas read or write data and which external systems they call without showing every implementation file.'
-                    : 'Select a node to isolate its immediate dependencies and inspect the exact scanned code relationships.'}
+                    ? 'See which product areas read or write data and which external systems they call. Select a connection to inspect its health and evidence.'
+                    : 'Select a node or connection to isolate exact scanned code relationships and inspect direct failure evidence.'}
               </p>
               <p className="muted">Red connections are failures. Orange connections represent downstream impact.</p>
             </div>
