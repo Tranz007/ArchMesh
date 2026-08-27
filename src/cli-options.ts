@@ -6,6 +6,7 @@ export interface CliOptions {
   diagnostics: boolean;
   changes: boolean;
   changesFrom?: string;
+  watch: boolean;
 }
 
 export function parseCliOptions(argv: string[], cwd = process.cwd()): CliOptions {
@@ -14,6 +15,7 @@ export function parseCliOptions(argv: string[], cwd = process.cwd()): CliOptions
   let diagnostics = false;
   let changes = false;
   let changesFrom: string | undefined;
+  let watch = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -25,6 +27,11 @@ export function parseCliOptions(argv: string[], cwd = process.cwd()): CliOptions
 
     if (argument === '--changes') {
       changes = true;
+      continue;
+    }
+
+    if (argument === '--watch') {
+      watch = true;
       continue;
     }
 
@@ -59,5 +66,6 @@ export function parseCliOptions(argv: string[], cwd = process.cwd()): CliOptions
     diagnostics,
     changes,
     changesFrom,
+    watch,
   };
 }
