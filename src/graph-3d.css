@@ -1,0 +1,33 @@
+.graph-canvas-3d {
+  overflow: hidden;
+}
+
+.graph-canvas-3d > div,
+.graph-canvas-3d canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.graph-nav-hint {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 10;
+  padding: 7px 10px;
+  border: 1px solid rgba(49, 61, 83, .82);
+  border-radius: 9px;
+  background: rgba(12, 18, 30, .78);
+  color: #8290a8;
+  font-size: 10px;
+  letter-spacing: .01em;
+  pointer-events: none;
+  user-select: none;
+  backdrop-filter: blur(10px);
+}
+
+@media (max-width: 680px) {
+  .graph-nav-hint {
+    display: none;
+  }
+}
