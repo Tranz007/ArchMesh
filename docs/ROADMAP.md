@@ -1,82 +1,134 @@
 # Roadmap
 
-The roadmap is organized around product capability, not calendar promises. Sequence may change as the first real codebases expose what matters most.
+The roadmap is organized around product capability, not calendar promises. Sequence can change as real codebases expose what matters most.
 
 ## Slice 1 — Local visual architecture
 
-Status: in progress
+Status: **complete baseline**
 
-Goals:
+Delivered:
 
-- local TypeScript/JavaScript scan;
-- file/import graph;
-- initial Next.js/common-role classification;
-- known integration nodes;
+- local TypeScript/JavaScript scanning;
+- exact file/import graph;
 - Sigma.js interactive graph;
-- search;
-- node inspector;
-- health-aware node/edge schema;
-- errors-only visualization using sample health states;
-- project documentation and agent guardrails.
+- search and inspection;
+- selectable nodes and connections;
+- health-aware nodes and edges;
+- errors-only visualization;
+- project documentation and agent guardrails;
+- clean CI validation and self-scan.
 
 ## Slice 2 — Make the graph architectural, not just structural
 
-Goals:
+Status: **substantial baseline delivered**
 
-- path alias/workspace resolution;
+Delivered:
+
+- TypeScript path alias resolution;
 - stronger Next.js App Router semantics;
-- React component relationships;
+- page/API route paths and HTTP methods;
+- server-action recognition;
 - product/feature grouping through configuration and detection;
-- clustering and progressive levels of detail;
-- improved graph layout stability;
-- richer inspector with inbound/outbound grouping;
-- navigation from graph entity to source file.
+- Architecture view and feature drill-down;
+- richer directional inspector;
+- explicit provenance for configured versus detected feature semantics.
+
+Remaining:
+
+- stronger React component semantics beyond imports;
+- workspace/package resolution;
+- large-repository clustering and progressive levels of detail;
+- source-editor navigation;
+- further layout stability/performance work.
 
 ## Slice 3 — Data and integration topology
 
-Goals:
+Status: **in progress**
 
-- Firebase collection/read/write/listener relationships;
-- generic HTTP/fetch relationships;
-- Stripe webhook/billing flows;
-- WorkOS/Resend/OpenAI semantic adapters;
-- clear evidence/provenance on inferred versus detected relationships;
-- integration-focused graph mode.
+Delivered:
+
+- Firebase/Firestore collection discovery;
+- read/write/listener relationships;
+- generic internal and external HTTP/fetch relationships;
+- dedicated Topology view;
+- first-class Firebase, Stripe, OpenAI, WorkOS, Resend, Vercel, and HTTP-host nodes.
+
+Remaining:
+
+- richer Stripe webhook/billing semantics;
+- WorkOS/Resend/OpenAI-specific operation semantics;
+- Firebase Auth/Storage/Functions topology;
+- additional evidence/provenance metadata for semantic adapters.
 
 ## Slice 4 — Change impact
 
-Goals:
+Status: **working baseline delivered**
 
-- Git diff ingestion;
-- changed-node highlighting;
-- upstream/downstream traversal;
-- bounded blast-radius view;
-- “show what this change touches” workflow;
-- comparison of graph state across commits/scans.
+Delivered:
+
+- Git working-tree change ingestion;
+- Git base-ref comparisons;
+- separate `changed` and `affected` state;
+- reverse-dependency traversal;
+- dedicated Changes view;
+- change-state inspector explanations;
+- health remains independent from change state.
+
+Remaining:
+
+- feature-level change aggregation in Architecture view;
+- bounded traversal controls;
+- graph comparisons between persisted scans/commits;
+- richer Git status/commit context;
+- change history and change-to-failure correlation.
 
 ## Slice 5 — Local health
 
-Goals:
+Status: **working baseline delivered**
 
-- compiler/build errors mapped to graph entities;
-- test failures mapped to graph entities;
-- browser/runtime development errors;
-- failed local API calls;
+Delivered:
+
+- generic health-signal schema and loader;
+- TypeScript compiler diagnostics;
 - direct `error` versus propagated `impacted` paths;
-- error inspector with source/message/time/evidence;
-- errors-only workflow backed by real signals rather than demo data.
+- selectable red connections;
+- source/message/time evidence in inspector;
+- evidence preservation through graph projections;
+- errors-only workflow backed by real signals.
+
+Remaining:
+
+- test failure adapters;
+- Next.js/Vite build-error adapters;
+- browser/runtime development errors;
+- failed local HTTP request ingestion;
+- lint/static-analysis warnings where materially useful.
 
 ## Slice 6 — Live architecture
 
-Goals:
+Status: **working baseline delivered**
 
-- file watching and incremental graph updates;
-- stable identities/layout across rescans;
-- architecture-change highlighting;
-- recent-change timeline;
-- correlation of change → first failure → impacted path.
+Delivered:
+
+- recursive local file watching;
+- debounced and serialized rebuilds;
+- generated/vendor path filtering;
+- shared graph-build pipeline;
+- viewer updates through a custom Vite event without a full page reload;
+- active graph view preserved across refreshes;
+- node/edge selection preserved when identity still exists.
+
+Remaining:
+
+- incremental scanning instead of full rescans;
+- content hashing and adapter-level invalidation;
+- graph deltas;
+- architecture-change animation/highlighting;
+- recent-change timeline.
 
 ## Slice 7 — Optional production telemetry
+
+Status: **planned**
 
 Goals:
 
@@ -87,15 +139,27 @@ Goals:
 
 ## Slice 8 — Portable developer tool
 
+Status: **planned / partially underway**
+
 Goals:
 
 - package/CLI experience approaching `npx archmesh .`;
 - first-run project setup;
-- configurable `.archmesh/` project semantics;
+- `.archmesh/` project semantics and state;
 - adapter/plugin contracts;
 - public sample projects and fixtures;
 - installation/update documentation;
 - performance work for large repositories.
+
+## Near-term priorities
+
+1. Incremental scanning and graph deltas for watch mode.
+2. Feature-level change aggregation and architecture drift visualization.
+3. More useful platform semantics for Firebase, Stripe, OpenAI, WorkOS, and Resend.
+4. Test/build/runtime failure adapters.
+5. Source-editor navigation from graph entities.
+6. Performance testing on genuinely large repositories.
+7. Packaging toward a one-command install/run experience.
 
 ## Later possibilities
 
