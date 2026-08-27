@@ -9,6 +9,7 @@ import { buildGraph, type BuildGraphResult } from './build-graph.js';
 import { parseCliOptions } from './cli-options.js';
 import { compareGraphs } from './drift/compare.js';
 import { createEmptyDriftGraph } from './drift/empty.js';
+import { sourceEditorPlugin } from './editor/plugin.js';
 import { writeGraphOutput } from './output.js';
 import { watchProject } from './watch.js';
 
@@ -28,6 +29,7 @@ Examples:
   archmesh /path/to/project --watch
   archmesh . --changes --diagnostics
   archmesh . --changes-from main
+  archmesh . --editor cursor
 
 Options:
   --watch                Rebuild when supported source/config files change
@@ -35,6 +37,7 @@ Options:
   --changes-from <ref>   Compare source changes against a Git base ref
   --diagnostics          Overlay TypeScript compiler diagnostics
   --health <file>        Load health signals from an explicit JSON file
+  --editor <name>        Source editor: auto, cursor, code, or zed
   -h, --help             Show this help
   -v, --version          Show the ArchMesh package version
 `);
@@ -83,6 +86,7 @@ logResult(initial);
 const server = await createServer({
   root: archMeshRoot,
   publicDir,
+  plugins: [sourceEditorPlugin(options.target, options.editor)],
   server: {
     port: 4242,
     strictPort: true,
