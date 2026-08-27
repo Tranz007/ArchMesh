@@ -26,6 +26,15 @@ const kindSize: Record<string, number> = {
   unknown: 7,
 };
 
+function stableCoordinate(id: string, salt: number) {
+  let hash = 2166136261 ^ salt;
+  for (let index = 0; index < id.length; index += 1) {
+    hash ^= id.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return ((hash >>> 0) % 10000) / 10000;
+}
+
 interface GraphCanvasProps {
   data: ArchGraphData;
   errorsOnly: boolean;
@@ -63,8 +72,8 @@ export function GraphCanvas({ data, errorsOnly, selectedNodeId, onSelectNode }: 
         kind: node.kind,
         health: node.health,
         path: node.path,
-        x: Math.random(),
-        y: Math.random(),
+        x: stableCoordinate(node.id, 17),
+        y: stableCoordinate(node.id, 71),
         size: kindSize[node.kind] ?? 7,
         color: healthColor[node.health],
       });
@@ -95,25 +104,27 @@ export function GraphCanvas({ data, errorsOnly, selectedNodeId, onSelectNode }: 
       });
     }
 
+    const activeSelection = selectedNodeId && graph.hasNode(selectedNodeId) ? selectedNodeId : undefined;
+
     const renderer = new Sigma(graph, containerRef.current, {
       renderEdgeLabels: false,
       labelRenderedSizeThreshold: 7,
       minCameraRatio: 0.08,
       maxCameraRatio: 8,
       nodeReducer(node, attributes) {
-        if (!selectedNodeId) return attributes;
-        if (node === selectedNodeId) {
+        if (!activeSelection) return attributes;
+        if (node === activeSelection) {
           return { ...attributes, highlighted: true, size: Number(attributes.size) * 1.3 };
         }
-        const neighbors = new Set(graph.neighbors(selectedNodeId));
+        const neighbors = new Set(graph.neighbors(activeSelection));
         if (neighbors.has(node)) return attributes;
         return { ...attributes, color: '#283146', label: '', zIndex: 0 };
       },
       edgeReducer(edge, attributes) {
-        if (!selectedNodeId) return attributes;
+        if (!activeSelection) return attributes;
         const source = graph.source(edge);
         const target = graph.target(edge);
-        if (source === selectedNodeId || target === selectedNodeId) {
+        if (source === activeSelection || target === activeSelection) {
           return { ...attributes, size: Math.max(Number(attributes.size), 2) };
         }
         return { ...attributes, color: '#222a3a', hidden: false, size: 0.5 };
