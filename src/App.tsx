@@ -16,7 +16,15 @@ import {
   XCircle,
 } from 'lucide-react';
 import { GraphCanvas } from './GraphCanvas';
+import { LensPanel } from './LensPanel';
 import { SourceOpenAction } from './SourceOpenAction';
+import {
+  projectHealthContext,
+  projectProductAreas,
+  projectRequestFlow,
+  projectSystemOverview,
+  type ArchitectureLens,
+} from './lenses';
 import { projectArchitecture } from './projections/architecture';
 import { projectChanges } from './projections/changes';
 import { projectDrift } from './projections/drift';
@@ -155,6 +163,7 @@ export default function App() {
   const [driftData, setDriftData] = useState<ArchGraphData>();
   const [source, setSource] = useState<'scan' | 'demo'>('demo');
   const [viewMode, setViewMode] = useState<ViewMode>('architecture');
+  const [activeLens, setActiveLens] = useState<ArchitectureLens>('system');
   const [focusedFeatureId, setFocusedFeatureId] = useState<string>();
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
@@ -201,21 +210,52 @@ export default function App() {
     () => projectArchitecture(data, focusedFeatureId),
     [data, focusedFeatureId],
   );
+  const systemProjection = useMemo(
+    () => projectSystemOverview(architectureProjection.graph),
+    [architectureProjection.graph],
+  );
+  const productAreasProjection = useMemo(
+    () => projectProductAreas(architectureProjection.graph),
+    [architectureProjection.graph],
+  );
   const topologyProjection = useMemo(() => projectTopology(data), [data]);
+  const requestFlowProjection = useMemo(() => projectRequestFlow(data), [data]);
   const changesProjection = useMemo(() => projectChanges(data), [data]);
   const driftProjection = useMemo(
     () => projectDrift(driftData ?? emptyDriftView(data)),
     [data, driftData],
   );
+  const healthProjection = useMemo(
+    () => projectHealthContext(architectureProjection.graph),
+    [architectureProjection.graph],
+  );
 
   const visibleData = useMemo(() => {
     if (source === 'demo') return data;
-    if (viewMode === 'architecture') return architectureProjection.graph;
-    if (viewMode === 'topology') return topologyProjection;
-    if (viewMode === 'changes') return changesProjection;
-    if (viewMode === 'drift') return driftProjection;
+    if (focusedFeatureId && viewMode === 'architecture') return architectureProjection.graph;
+    if (activeLens === 'system') return systemProjection;
+    if (activeLens === 'areas') return productAreasProjection;
+    if (activeLens === 'topology') return topologyProjection;
+    if (activeLens === 'request-flow') return requestFlowProjection;
+    if (activeLens === 'changes') return changesProjection;
+    if (activeLens === 'health') return healthProjection;
+    if (activeLens === 'drift') return driftProjection;
     return data;
-  }, [architectureProjection.graph, changesProjection, data, driftProjection, source, topologyProjection, viewMode]);
+  }, [
+    activeLens,
+    architectureProjection.graph,
+    changesProjection,
+    data,
+    driftProjection,
+    focusedFeatureId,
+    healthProjection,
+    productAreasProjection,
+    requestFlowProjection,
+    source,
+    systemProjection,
+    topologyProjection,
+    viewMode,
+  ]);
 
   const selectNode = useCallback((nodeId?: string) => {
     setSelectedEdgeId(undefined);
@@ -305,9 +345,38 @@ export default function App() {
 
   const changeView = (mode: ViewMode) => {
     setViewMode(mode);
+    setActiveLens(
+      mode === 'architecture'
+        ? 'system'
+        : mode === 'topology'
+          ? 'topology'
+          : mode === 'changes'
+            ? 'changes'
+            : mode === 'drift'
+              ? 'drift'
+              : 'code',
+    );
     clearSelection();
     setErrorsOnly(false);
     if (mode !== 'architecture') setFocusedFeatureId(undefined);
+  };
+
+  const activateLens = (lens: ArchitectureLens) => {
+    setActiveLens(lens);
+    setViewMode(
+      lens === 'system' || lens === 'areas' || lens === 'health'
+        ? 'architecture'
+        : lens === 'topology'
+          ? 'topology'
+          : lens === 'changes'
+            ? 'changes'
+            : lens === 'drift'
+              ? 'drift'
+              : 'code',
+    );
+    setFocusedFeatureId(undefined);
+    setErrorsOnly(false);
+    clearSelection();
   };
 
   const focusedFeature = architectureProjection.graph.nodes.find(
@@ -324,16 +393,21 @@ export default function App() {
   const affectedMembers = positiveCount(selectedNode?.metadata?.affectedMembers);
   const changedFeatures = positiveCount(selectedNode?.metadata?.changedFeatures);
   const affectedFeatures = positiveCount(selectedNode?.metadata?.affectedFeatures);
+  const hiddenNodes = positiveCount(visibleData.metadata?.hiddenNodes) ?? 0;
 
-  const searchPlaceholder = viewMode === 'architecture'
-    ? 'Find a feature, integration, service…'
-    : viewMode === 'topology'
-      ? 'Find a feature, collection, integration…'
-      : viewMode === 'changes'
-        ? 'Find changed or affected code…'
-        : viewMode === 'drift'
-          ? 'Find added, removed, or modified architecture…'
-          : 'Find a route, component, file…';
+  const searchPlaceholder = activeLens === 'request-flow'
+    ? 'Find a route, API, service…'
+    : activeLens === 'health'
+      ? 'Find a failing or impacted area…'
+      : viewMode === 'architecture'
+        ? 'Find a feature, integration, service…'
+        : viewMode === 'topology'
+          ? 'Find a feature, collection, integration…'
+          : viewMode === 'changes'
+            ? 'Find changed or affected code…'
+            : viewMode === 'drift'
+              ? 'Find added, removed, or modified architecture…'
+              : 'Find a route, component, file…';
 
   return (
     <main className="app-shell">
@@ -494,9 +568,14 @@ export default function App() {
                 <span><i className="legend-dot error" />Error overrides change color</span>
               </>
             ) : (
-              (['healthy', 'warning', 'error', 'impacted'] as HealthState[]).map((health) => (
-                <span key={health}><i className={`legend-dot ${health}`} />{healthLabel[health]}</span>
-              ))
+              <>
+                <span><i className="legend-kind product" />Product</span>
+                <span><i className="legend-kind feature" />Feature</span>
+                <span><i className="legend-kind service" />Service / API</span>
+                <span><i className="legend-kind data" />Data</span>
+                <span><i className="legend-kind integration" />Integration</span>
+                <span><i className="legend-dot error" />Failure</span>
+              </>
             )}
           </div>
         </div>
@@ -634,42 +713,18 @@ export default function App() {
                 onSelect={selectNode}
               />
             </>
+          ) : source === 'scan' ? (
+            <LensPanel
+              activeLens={activeLens}
+              hiddenNodes={hiddenNodes}
+              onSelect={activateLens}
+            />
           ) : (
             <div className="empty-inspector">
               <Boxes size={34} />
-              <h2>
-                {viewMode === 'architecture'
-                  ? 'Explore the system'
-                  : viewMode === 'topology'
-                    ? 'Explore data and integrations'
-                    : viewMode === 'changes'
-                      ? 'Explore change impact'
-                      : viewMode === 'drift'
-                        ? 'Explore architecture drift'
-                        : 'Inspect the code graph'}
-              </h2>
-              <p>
-                {viewMode === 'architecture'
-                  ? 'Select a feature, integration, or connection to understand the human architecture, then drill into a feature when you need code-level detail.'
-                  : viewMode === 'topology'
-                    ? 'See which product areas read or write data and which external systems they call. Select a connection to inspect its health and evidence.'
-                    : viewMode === 'changes'
-                      ? visibleData.nodes.length > 0
-                        ? 'Blue nodes changed directly. Purple nodes depend on those changes. Health remains a separate signal, so a changed node can still be healthy or failing.'
-                        : 'No changed source is present in this scan. Run ArchMesh with --changes or --changes-from <ref> to populate this view.'
-                      : viewMode === 'drift'
-                        ? visibleData.nodes.length > 0
-                          ? 'Green is newly added architecture, pink is removed architecture retained from the previous scan, and gold is the same entity with modified structural metadata.'
-                          : 'No architecture drift has been observed yet. Run ArchMesh with --watch and change supported source or configuration to compare consecutive successful scans.'
-                        : 'Select a node or connection to isolate exact scanned code relationships and inspect direct failure evidence.'}
-              </p>
-              <p className="muted">
-                {viewMode === 'changes'
-                  ? 'Changed and affected describe source-control impact, not runtime health.'
-                  : viewMode === 'drift'
-                    ? 'Drift describes graph structure between live scans. Health and Git change state remain independent.'
-                    : 'Red connections are failures. Orange connections represent downstream impact.'}
-              </p>
+              <h2>Explore the system</h2>
+              <p>Select a node or connection to understand its role, health, and relationships.</p>
+              <p className="muted">Run ArchMesh against a local project to unlock architecture lenses.</p>
             </div>
           )}
         </aside>

@@ -38,10 +38,13 @@ function titleCase(value: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+const nextMetadataFile = /^(robots|sitemap|manifest|favicon|icon|apple-icon|opengraph-image|twitter-image)(\.[^.]+)*\.[jt]sx?$/;
+
 function cleanRouteSegment(segment: string | undefined) {
   if (!segment) return undefined;
   if (segment.startsWith('(') || segment.startsWith('[')) return undefined;
   if (/^(page|layout|loading|error|not-found|route)\.[jt]sx?$/.test(segment)) return undefined;
+  if (nextMetadataFile.test(segment)) return undefined;
   return segment;
 }
 

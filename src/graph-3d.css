@@ -9,25 +9,89 @@
   max-height: 100%;
 }
 
-.graph-nav-hint {
+.graph-controls {
   position: absolute;
   right: 16px;
   bottom: 16px;
   z-index: 10;
-  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
   border: 1px solid rgba(49, 61, 83, .82);
-  border-radius: 9px;
-  background: rgba(12, 18, 30, .78);
+  border-radius: 10px;
+  background: rgba(12, 18, 30, .82);
   color: #8290a8;
   font-size: 10px;
   letter-spacing: .01em;
-  pointer-events: none;
-  user-select: none;
   backdrop-filter: blur(10px);
 }
 
+.graph-controls button {
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid #35425a;
+  border-radius: 7px;
+  background: #151e2e;
+  color: #c6d0df;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.graph-controls button:hover {
+  border-color: #536783;
+  background: #1b2739;
+  color: #eef3fb;
+}
+
+.graph-controls button:focus-visible {
+  outline: 2px solid #86a8e0;
+  outline-offset: 2px;
+}
+
+.graph-controls span {
+  padding-right: 5px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.legend-kind {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  flex: 0 0 auto;
+  background: #7f8da8;
+}
+
+.legend-kind.product {
+  background: #d6e2f5;
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.legend-kind.feature {
+  background: #6f95d8;
+  border-radius: 50%;
+}
+
+.legend-kind.service {
+  background: #53a8c7;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
+
+.legend-kind.data {
+  width: 9px;
+  background: #4fae92;
+  border-radius: 50% / 28%;
+}
+
+.legend-kind.integration {
+  background: #a178d0;
+  transform: rotate(45deg);
+}
+
 @media (max-width: 680px) {
-  .graph-nav-hint {
+  .graph-controls span {
     display: none;
   }
 }
