@@ -18,18 +18,25 @@ describe('projectArchitecture', () => {
     generatedAt: '2026-08-27T00:00:00.000Z',
     nodes: [
       { id: 'story-page', label: 'page.tsx', kind: 'route', path: 'src/app/story/page.tsx', health: 'healthy' },
-      { id: 'story-service', label: 'story-service.ts', kind: 'service', path: 'src/app/story/story-service.ts', health: 'healthy' },
+      { id: 'story-service', label: 'story-service.ts', kind: 'service', path: 'src/app/story/story-service.ts', health: 'error' },
       { id: 'hiring-page', label: 'page.tsx', kind: 'route', path: 'src/app/hiring/page.tsx', health: 'impacted' },
-      { id: 'stripe', label: 'Stripe', kind: 'integration', health: 'error' },
+      { id: 'stripe', label: 'Stripe', kind: 'integration', health: 'healthy' },
     ],
     edges: [
       { id: 'e1', source: 'story-page', target: 'story-service', relation: 'imports', health: 'healthy' },
       { id: 'e2', source: 'hiring-page', target: 'story-service', relation: 'imports', health: 'impacted' },
-      { id: 'e3', source: 'story-service', target: 'stripe', relation: 'integrates-with', health: 'error' },
+      {
+        id: 'e3',
+        source: 'story-service',
+        target: 'stripe',
+        relation: 'integrates-with',
+        health: 'error',
+        metadata: { healthSource: 'runtime', healthMessage: 'Stripe request failed' },
+      },
     ],
   };
 
-  it('collapses files into feature-level architecture', () => {
+  it('collapses files into feature-level architecture and preserves severe edge evidence', () => {
     const projection = projectArchitecture(graph).graph;
 
     expect(projection.nodes).toEqual(
@@ -43,7 +50,13 @@ describe('projectArchitecture', () => {
     expect(projection.edges).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ source: 'feature:hiring', target: 'feature:story', relation: 'depends-on' }),
-        expect.objectContaining({ source: 'feature:story', target: 'stripe', relation: 'integrates-with', health: 'error' }),
+        expect.objectContaining({
+          source: 'feature:story',
+          target: 'stripe',
+          relation: 'integrates-with',
+          health: 'error',
+          metadata: expect.objectContaining({ healthMessage: 'Stripe request failed' }),
+        }),
       ]),
     );
   });
