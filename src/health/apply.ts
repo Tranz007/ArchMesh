@@ -1,4 +1,4 @@
-import type { ArchGraphData, ArchNode, HealthState } from '../types.js';
+import type { ArchEdge, ArchGraphData, ArchNode, GraphMetadata, HealthState } from '../types.js';
 import type { HealthNodeRef, HealthSignal } from './types.js';
 
 const healthRank: Record<HealthState, number> = {
@@ -24,7 +24,10 @@ function cloneGraph(graph: ArchGraphData): ArchGraphData {
       ...node,
       metadata: node.metadata ? { ...node.metadata } : undefined,
     })),
-    edges: graph.edges.map((edge) => ({ ...edge })),
+    edges: graph.edges.map((edge) => ({
+      ...edge,
+      metadata: edge.metadata ? { ...edge.metadata } : undefined,
+    })),
   };
 }
 
@@ -41,13 +44,26 @@ function resolveNode(ref: HealthNodeRef | undefined, nodes: ArchNode[]) {
   return undefined;
 }
 
-function attachEvidence(node: ArchNode, signal: HealthSignal) {
-  node.metadata = {
-    ...(node.metadata ?? {}),
+function evidence(signal: HealthSignal): GraphMetadata {
+  return {
     healthSource: signal.source,
     healthMessage: signal.message,
     healthTimestamp: signal.timestamp ?? new Date().toISOString(),
     healthSignalId: signal.id ?? null,
+  };
+}
+
+function attachNodeEvidence(node: ArchNode, signal: HealthSignal) {
+  node.metadata = {
+    ...(node.metadata ?? {}),
+    ...evidence(signal),
+  };
+}
+
+function attachEdgeEvidence(edge: ArchEdge, signal: HealthSignal) {
+  edge.metadata = {
+    ...(edge.metadata ?? {}),
+    ...evidence(signal),
   };
 }
 
@@ -86,7 +102,7 @@ export function applyHealthSignals(graphInput: ArchGraphData, signals: HealthSig
       const node = resolveNode(signal.node, graph.nodes);
       if (node) {
         node.health = worseHealth(node.health, signalHealth);
-        attachEvidence(node, signal);
+        attachNodeEvidence(node, signal);
         if (signal.severity === 'error') directErrors.add(node.id);
       }
     }
@@ -99,10 +115,13 @@ export function applyHealthSignals(graphInput: ArchGraphData, signals: HealthSig
       const edge = graph.edges.find((candidate) =>
         candidate.source === source.id && candidate.target === target.id,
       );
-      if (edge) edge.health = worseHealth(edge.health, signalHealth);
+      if (edge) {
+        edge.health = worseHealth(edge.health, signalHealth);
+        attachEdgeEvidence(edge, signal);
+      }
 
       source.health = worseHealth(source.health, signalHealth);
-      attachEvidence(source, signal);
+      attachNodeEvidence(source, signal);
       if (signal.severity === 'error') directErrors.add(source.id);
     }
   }
