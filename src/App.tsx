@@ -10,6 +10,7 @@ import {
   Code2,
   Database,
   GitBranch,
+  History,
   Network,
   Search,
   XCircle,
@@ -17,6 +18,7 @@ import {
 import { GraphCanvas } from './GraphCanvas';
 import { projectArchitecture } from './projections/architecture';
 import { projectChanges } from './projections/changes';
+import { projectDrift } from './projections/drift';
 import { projectTopology } from './projections/topology';
 import { sampleGraph } from './sample-graph';
 import type {
@@ -24,6 +26,7 @@ import type {
   ArchGraphData,
   ArchNode,
   ChangeState,
+  DriftState,
   GraphMetadata,
   HealthState,
 } from './types';
@@ -42,7 +45,14 @@ const changeLabel: Record<ChangeState, string> = {
   affected: 'Affected',
 };
 
-type ViewMode = 'architecture' | 'topology' | 'changes' | 'code';
+const driftLabel: Record<DriftState, string> = {
+  stable: 'Stable',
+  added: 'Added',
+  removed: 'Removed',
+  modified: 'Modified',
+};
+
+type ViewMode = 'architecture' | 'topology' | 'changes' | 'drift' | 'code';
 
 interface ConnectionListProps {
   title: string;
@@ -68,7 +78,7 @@ function ConnectionList({ title, icon, edges, selectedNodeId, data, onSelect }: 
           const other = data.nodes.find((node) => node.id === otherId);
           return (
             <button key={edge.id} type="button" onClick={() => onSelect(otherId)}>
-              <span className={`edge-state ${edge.health} change-${edge.change ?? 'unchanged'}`} />
+              <span className={`edge-state ${edge.health} change-${edge.change ?? 'unchanged'} drift-${edge.drift ?? 'stable'}`} />
               <span className="connection-copy">
                 <strong>{other?.label ?? otherId}</strong>
                 <small>{edge.relation}{edge.label ? ` · ${edge.label}` : ''}</small>
@@ -108,12 +118,40 @@ function ChangeBadge({ change }: { change?: ChangeState }) {
   return <div className={`change-badge ${change}`}>{changeLabel[change]}</div>;
 }
 
+function DriftBadge({ drift }: { drift?: DriftState }) {
+  if (!drift || drift === 'stable') return null;
+  return <div className={`drift-badge ${drift}`}>{driftLabel[drift]}</div>;
+}
+
+function DriftNote({ drift }: { drift?: DriftState }) {
+  if (!drift || drift === 'stable') return null;
+
+  const copy = drift === 'added'
+    ? 'This entity appeared in the current scan and was not present in the previous successful live scan.'
+    : drift === 'removed'
+      ? 'This entity existed in the previous successful live scan but is absent from the current architecture. It is shown as historical context.'
+      : 'This entity kept the same identity, but its structural role or architecture metadata changed between scans.';
+
+  return <p className={`drift-note ${drift}`}>{copy}</p>;
+}
+
 function positiveCount(value: unknown) {
   return typeof value === 'number' && value > 0 ? value : undefined;
 }
 
+function emptyDriftView(data: ArchGraphData): ArchGraphData {
+  return {
+    project: data.project,
+    generatedAt: data.generatedAt,
+    nodes: [],
+    edges: [],
+    metadata: { graphKind: 'drift' },
+  };
+}
+
 export default function App() {
   const [data, setData] = useState<ArchGraphData>(sampleGraph);
+  const [driftData, setDriftData] = useState<ArchGraphData>();
   const [source, setSource] = useState<'scan' | 'demo'>('demo');
   const [viewMode, setViewMode] = useState<ViewMode>('architecture');
   const [focusedFeatureId, setFocusedFeatureId] = useState<string>();
@@ -130,8 +168,19 @@ export default function App() {
       if (!Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) throw new Error('Invalid graph data');
       setData(graph);
       setSource('scan');
+
+      try {
+        const driftResponse = await fetch(`/archmesh-drift.json?t=${Date.now()}`, { cache: 'no-store' });
+        if (!driftResponse.ok) throw new Error('No drift data');
+        const drift = await driftResponse.json() as ArchGraphData;
+        if (!Array.isArray(drift.nodes) || !Array.isArray(drift.edges)) throw new Error('Invalid drift data');
+        setDriftData(drift);
+      } catch {
+        setDriftData(undefined);
+      }
     } catch {
       setData(sampleGraph);
+      setDriftData(undefined);
       setSource('demo');
     }
   }, []);
@@ -153,14 +202,19 @@ export default function App() {
   );
   const topologyProjection = useMemo(() => projectTopology(data), [data]);
   const changesProjection = useMemo(() => projectChanges(data), [data]);
+  const driftProjection = useMemo(
+    () => projectDrift(driftData ?? emptyDriftView(data)),
+    [data, driftData],
+  );
 
   const visibleData = useMemo(() => {
     if (source === 'demo') return data;
     if (viewMode === 'architecture') return architectureProjection.graph;
     if (viewMode === 'topology') return topologyProjection;
     if (viewMode === 'changes') return changesProjection;
+    if (viewMode === 'drift') return driftProjection;
     return data;
-  }, [architectureProjection.graph, changesProjection, data, source, topologyProjection, viewMode]);
+  }, [architectureProjection.graph, changesProjection, data, driftProjection, source, topologyProjection, viewMode]);
 
   const selectNode = useCallback((nodeId?: string) => {
     setSelectedEdgeId(undefined);
@@ -228,11 +282,17 @@ export default function App() {
       unknown: 0,
       changed: 0,
       affected: 0,
+      added: 0,
+      removed: 0,
+      modified: 0,
     };
     for (const node of visibleData.nodes) {
       result[node.health] += 1;
       if (node.change === 'changed') result.changed += 1;
       if (node.change === 'affected') result.affected += 1;
+      if (node.drift === 'added') result.added += 1;
+      if (node.drift === 'removed') result.removed += 1;
+      if (node.drift === 'modified') result.modified += 1;
     }
     return result;
   }, [visibleData.nodes]);
@@ -270,7 +330,9 @@ export default function App() {
       ? 'Find a feature, collection, integration…'
       : viewMode === 'changes'
         ? 'Find changed or affected code…'
-        : 'Find a route, component, file…';
+        : viewMode === 'drift'
+          ? 'Find added, removed, or modified architecture…'
+          : 'Find a route, component, file…';
 
   return (
     <main className="app-shell">
@@ -284,7 +346,13 @@ export default function App() {
         </div>
 
         <div className="status-strip" aria-label="Architecture status summary">
-          {viewMode === 'changes' && source === 'scan' ? (
+          {viewMode === 'drift' && source === 'scan' ? (
+            <>
+              <span className="status status-drift-added"><History size={14} /> {counts.added} added</span>
+              <span className="status status-drift-removed"><History size={14} /> {counts.removed} removed</span>
+              <span className="status status-drift-modified"><History size={14} /> {counts.modified} modified</span>
+            </>
+          ) : viewMode === 'changes' && source === 'scan' ? (
             <>
               <span className="status status-changed"><GitBranch size={14} /> {counts.changed} changed</span>
               <span className="status status-affected"><CircleDot size={14} /> {counts.affected} affected</span>
@@ -355,6 +423,13 @@ export default function App() {
               </button>
               <button
                 type="button"
+                className={viewMode === 'drift' ? 'selected' : ''}
+                onClick={() => changeView('drift')}
+              >
+                <History size={14} /> Drift
+              </button>
+              <button
+                type="button"
                 className={viewMode === 'code' ? 'selected' : ''}
                 onClick={() => changeView('code')}
               >
@@ -362,7 +437,7 @@ export default function App() {
               </button>
             </div>
           )}
-          {viewMode !== 'changes' && (
+          {viewMode !== 'changes' && viewMode !== 'drift' && (
             <button
               type="button"
               className={errorsOnly ? 'active' : ''}
@@ -397,13 +472,21 @@ export default function App() {
           <GraphCanvas
             data={visibleData}
             errorsOnly={errorsOnly}
+            visualMode={viewMode === 'drift' ? 'drift' : 'default'}
             selectedNodeId={selectedNodeId}
             selectedEdgeId={selectedEdgeId}
             onSelectNode={selectNode}
             onSelectEdge={selectEdge}
           />
           <div className="legend" aria-label="Graph legend">
-            {viewMode === 'changes' ? (
+            {viewMode === 'drift' ? (
+              <>
+                <span><i className="legend-dot drift-added" />Added</span>
+                <span><i className="legend-dot drift-removed" />Removed</span>
+                <span><i className="legend-dot drift-modified" />Modified</span>
+                <span><i className="legend-dot drift-stable" />Context</span>
+              </>
+            ) : viewMode === 'changes' ? (
               <>
                 <span><i className="legend-dot changed" />Changed</span>
                 <span><i className="legend-dot affected" />Affected</span>
@@ -424,6 +507,7 @@ export default function App() {
               <h2>{selectedEdge.label ?? selectedEdge.relation}</h2>
               <div className={`health-badge ${selectedEdge.health}`}>{healthLabel[selectedEdge.health]}</div>
               <ChangeBadge change={selectedEdge.change} />
+              <DriftBadge drift={selectedEdge.drift} />
 
               <div className="edge-route" aria-label="Connection direction">
                 <button type="button" onClick={() => selectNode(selectedEdge.source)}>
@@ -438,6 +522,7 @@ export default function App() {
               </div>
 
               <HealthEvidence health={selectedEdge.health} metadata={selectedEdge.metadata} />
+              <DriftNote drift={selectedEdge.drift} />
 
               {selectedEdge.health === 'impacted' && (
                 <p className="impact-note">
@@ -456,9 +541,11 @@ export default function App() {
               <h2>{selectedNode.label}</h2>
               <div className={`health-badge ${selectedNode.health}`}>{healthLabel[selectedNode.health]}</div>
               <ChangeBadge change={selectedNode.change} />
+              <DriftBadge drift={selectedNode.drift} />
               {selectedNode.path && <code className="path">{selectedNode.path}</code>}
 
               <HealthEvidence health={selectedNode.health} metadata={selectedNode.metadata} />
+              <DriftNote drift={selectedNode.drift} />
 
               {(routePath || httpMethods || serverActionCount || semanticSource || provider || resourceType) && (
                 <dl className="entity-facts">
@@ -553,7 +640,9 @@ export default function App() {
                     ? 'Explore data and integrations'
                     : viewMode === 'changes'
                       ? 'Explore change impact'
-                      : 'Inspect the code graph'}
+                      : viewMode === 'drift'
+                        ? 'Explore architecture drift'
+                        : 'Inspect the code graph'}
               </h2>
               <p>
                 {viewMode === 'architecture'
@@ -564,12 +653,18 @@ export default function App() {
                       ? visibleData.nodes.length > 0
                         ? 'Blue nodes changed directly. Purple nodes depend on those changes. Health remains a separate signal, so a changed node can still be healthy or failing.'
                         : 'No changed source is present in this scan. Run ArchMesh with --changes or --changes-from <ref> to populate this view.'
-                      : 'Select a node or connection to isolate exact scanned code relationships and inspect direct failure evidence.'}
+                      : viewMode === 'drift'
+                        ? visibleData.nodes.length > 0
+                          ? 'Green is newly added architecture, pink is removed architecture retained from the previous scan, and gold is the same entity with modified structural metadata.'
+                          : 'No architecture drift has been observed yet. Run ArchMesh with --watch and change supported source or configuration to compare consecutive successful scans.'
+                        : 'Select a node or connection to isolate exact scanned code relationships and inspect direct failure evidence.'}
               </p>
               <p className="muted">
                 {viewMode === 'changes'
                   ? 'Changed and affected describe source-control impact, not runtime health.'
-                  : 'Red connections are failures. Orange connections represent downstream impact.'}
+                  : viewMode === 'drift'
+                    ? 'Drift describes graph structure between live scans. Health and Git change state remain independent.'
+                    : 'Red connections are failures. Orange connections represent downstream impact.'}
               </p>
             </div>
           )}
