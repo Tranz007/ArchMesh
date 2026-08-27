@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 export type EditorPreference = 'auto' | 'cursor' | 'code' | 'zed';
+export type EditorLauncher = (command: string, args: string[]) => Promise<void>;
 
 export interface OpenSourceRequest {
   projectRoot: string;
@@ -15,7 +16,7 @@ export interface OpenSourceResult {
   editor: Exclude<EditorPreference, 'auto'>;
 }
 
-function resolveInsideProject(projectRoot: string, relativePath: string) {
+export function resolveSourcePath(projectRoot: string, relativePath: string) {
   const root = path.resolve(projectRoot);
   const absolutePath = path.resolve(root, relativePath);
   const relative = path.relative(root, absolutePath);
@@ -59,36 +60,34 @@ function commandFor(editor: Exclude<EditorPreference, 'auto'>, absolutePath: str
   return { command: editor, args: ['--goto', absolutePath] };
 }
 
-function spawnDetached(command: string, args: string[]) {
-  return new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, {
-      detached: true,
-      stdio: 'ignore',
-    });
-
-    child.once('error', reject);
-    child.once('spawn', () => {
-      child.unref();
-      resolve();
-    });
+const spawnDetached: EditorLauncher = (command, args) => new Promise<void>((resolve, reject) => {
+  const child = spawn(command, args, {
+    detached: true,
+    stdio: 'ignore',
   });
-}
+
+  child.once('error', reject);
+  child.once('spawn', () => {
+    child.unref();
+    resolve();
+  });
+});
 
 export async function openSourceFile({
   projectRoot,
   relativePath,
   editor = 'auto',
-}: OpenSourceRequest): Promise<OpenSourceResult> {
+}: OpenSourceRequest, launch: EditorLauncher = spawnDetached): Promise<OpenSourceResult> {
   if (!relativePath || relativePath.includes('\0')) throw new Error('A source path is required.');
 
-  const absolutePath = resolveInsideProject(projectRoot, relativePath);
+  const absolutePath = resolveSourcePath(projectRoot, relativePath);
   await assertSourceFile(absolutePath);
 
   const errors: string[] = [];
   for (const candidate of editorCandidates(editor)) {
     const { command, args } = commandFor(candidate, absolutePath);
     try {
-      await spawnDetached(command, args);
+      await launch(command, args);
       return { absolutePath, editor: candidate };
     } catch (error) {
       errors.push(`${candidate}: ${error instanceof Error ? error.message : String(error)}`);
