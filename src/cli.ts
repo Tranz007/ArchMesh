@@ -1,3 +1,6 @@
+#!/usr/bin/env node
+
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
@@ -10,7 +13,44 @@ import { watchProject } from './watch.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const archMeshRoot = path.resolve(here, '..');
-const options = parseCliOptions(process.argv.slice(2));
+const rawArgs = process.argv.slice(2);
+
+function printHelp() {
+  console.log(`
+ArchMesh — local-first visual software architecture explorer
+
+Usage:
+  archmesh [project] [options]
+
+Examples:
+  archmesh .
+  archmesh /path/to/project --watch
+  archmesh . --changes --diagnostics
+  archmesh . --changes-from main
+
+Options:
+  --watch                Rebuild when supported source/config files change
+  --changes              Highlight working-tree changes and affected dependents
+  --changes-from <ref>   Compare source changes against a Git base ref
+  --diagnostics          Overlay TypeScript compiler diagnostics
+  --health <file>        Load health signals from an explicit JSON file
+  -h, --help             Show this help
+  -v, --version          Show the ArchMesh package version
+`);
+}
+
+if (rawArgs.includes('--help') || rawArgs.includes('-h')) {
+  printHelp();
+  process.exit(0);
+}
+
+if (rawArgs.includes('--version') || rawArgs.includes('-v')) {
+  const packageJson = JSON.parse(await fs.readFile(path.join(archMeshRoot, 'package.json'), 'utf8')) as { version?: string };
+  console.log(packageJson.version ?? 'unknown');
+  process.exit(0);
+}
+
+const options = parseCliOptions(rawArgs);
 const output = path.join(archMeshRoot, 'public', 'archmesh.json');
 const driftOutput = path.join(archMeshRoot, 'public', 'archmesh-drift.json');
 
