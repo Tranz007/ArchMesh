@@ -2,7 +2,7 @@
 
 ArchMesh treats health as part of architecture. The goal is not to bolt a monitoring dashboard onto a dependency graph; it is to let build, test, runtime, and integration evidence illuminate the architectural path users already understand.
 
-The first health pipeline is now implemented locally:
+The local health pipeline is:
 
 ```text
 architecture scan
@@ -24,9 +24,7 @@ Architecture / Topology / Code views
 
 ### `healthy`
 
-No known failure is associated with the entity or relationship in the active scan.
-
-`healthy` is not proof that a system is globally correct. It means ArchMesh currently has no evidence marking it otherwise.
+No known failure is associated with the entity or relationship in the active scan. This is not proof that the system is globally correct; it means ArchMesh currently has no evidence marking it otherwise.
 
 ### `warning`
 
@@ -34,21 +32,11 @@ Direct evidence says an entity or relationship deserves attention but is not a c
 
 ### `error`
 
-Direct evidence identifies the node or connection as failing.
-
-Examples:
-
-- a route returned a 500;
-- TypeScript reports an error in a source file;
-- a test adapter maps a failure to a service;
-- a webhook call fails;
-- a dependency connection has direct runtime failure evidence.
+Direct evidence identifies a node or connection as failing. Examples include a route returning 500, a compiler error in a source file, a test failure mapped to a service, or a failed API/webhook relationship.
 
 ### `impacted`
 
 The entity or relationship depends on a known error and may be affected, but ArchMesh does not have direct evidence that it is failing.
-
-This distinction is fundamental.
 
 ```text
 UI
@@ -61,15 +49,15 @@ API
    ERROR
 ```
 
-Because ArchMesh dependency edges point from a consumer toward what it depends on, impact propagation walks **incoming edges** from the direct failure back toward consumers.
+Because dependency edges point from a consumer toward what it depends on, impact propagation walks incoming edges from the direct failure back toward consumers.
 
 ### `unknown`
 
 ArchMesh lacks sufficient evidence to establish health.
 
-## Current health signal contract
+## Health signal contract
 
-Health adapters produce a small common signal shape:
+Adapters emit a small common signal shape:
 
 ```ts
 interface HealthSignal {
@@ -89,11 +77,9 @@ interface HealthSignal {
 }
 ```
 
-A signal must target either a node or a directed edge.
+A signal targets either a node or a directed edge.
 
-Node signals are useful for compiler, test, or runtime failures that map cleanly to one source entity.
-
-Edge signals are useful when the failure is specifically a relationship such as an API request or dependency call. In that case ArchMesh marks the connection itself `error` and the calling/source node `error` without claiming the target failed.
+Node signals are useful for compiler, test, or runtime failures that map cleanly to one source entity. Edge signals are useful when the failure is specifically a relationship such as an API request or dependency call. In that case ArchMesh marks the connection `error` and the calling/source node `error` without claiming the target failed.
 
 ## Local health file
 
@@ -111,13 +97,13 @@ Example:
 {
   "signals": [
     {
-      "id": "story-publish-500",
+      "id": "checkout-submit-500",
       "severity": "error",
       "source": "runtime",
-      "message": "POST /api/story/publish returned 500",
+      "message": "POST /api/checkout/submit returned 500",
       "edge": {
-        "source": { "path": "src/app/story/page.tsx" },
-        "target": { "path": "src/app/api/story/publish/route.ts" }
+        "source": { "path": "src/app/checkout/page.tsx" },
+        "target": { "path": "src/app/api/checkout/submit/route.ts" }
       }
     }
   ]
@@ -134,9 +120,7 @@ See [`examples/health.json`](../examples/health.json).
 
 ## TypeScript diagnostics
 
-ArchMesh includes its first automatic health adapter: TypeScript compiler diagnostics.
-
-Run:
+ArchMesh includes an automatic health adapter for TypeScript compiler diagnostics:
 
 ```bash
 npm run atlas -- /path/to/project --diagnostics
@@ -154,17 +138,15 @@ npm run scan -- /path/to/project --diagnostics
 
 ## Combining health sources
 
-The health file and TypeScript diagnostics can be combined:
-
 ```bash
 npm run atlas -- /path/to/project --health ./runtime-signals.json --diagnostics
 ```
 
-All signals are applied to the same graph before the viewer opens.
+All signals are applied to the same graph before rendering.
 
-## Evidence retained on nodes
+## Evidence retained on nodes and edges
 
-When a direct signal maps to a node, ArchMesh stores local evidence in node metadata:
+When a direct signal maps to a graph entity, ArchMesh stores local evidence metadata such as:
 
 ```text
 healthSource
@@ -173,7 +155,7 @@ healthTimestamp
 healthSignalId
 ```
 
-This is what the inspector can use to answer “why is this red?” without confusing a propagated impact state with direct evidence.
+This lets the inspector answer “why is this red?” without confusing propagated impact with direct evidence.
 
 ## Propagation rules
 
@@ -189,7 +171,7 @@ Current propagation is deliberately simple and explainable:
 
 Future versions may add bounded depth, relation-specific propagation, and confidence rules.
 
-## Current and planned signal sources
+## Signal sources
 
 Implemented:
 
@@ -214,11 +196,11 @@ Possible optional production adapters:
 
 Hosted integrations must remain optional. The local-first architecture should not become dependent on any one vendor.
 
-## Error inspector direction
+## Inspector direction
 
 The inspector separates outbound and inbound relationships:
 
-- **Depends on** — what the selected entity consumes/calls/imports;
+- **Depends on** — what the selected entity consumes, calls, or imports;
 - **Depended on by** — what may be affected when the selected entity fails.
 
 This direction is especially important when reading impact propagation.
