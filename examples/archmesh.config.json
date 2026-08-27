@@ -1,27 +1,27 @@
 {
   "features": [
     {
-      "id": "story",
-      "label": "Story",
+      "id": "catalog",
+      "label": "Catalog",
       "paths": [
-        "src/app/story/**",
-        "src/features/story/**"
+        "src/app/catalog/**",
+        "src/features/catalog/**"
       ]
     },
     {
-      "id": "hiring",
-      "label": "Hiring",
+      "id": "orders",
+      "label": "Orders",
       "paths": [
-        "src/app/hiring/**",
-        "src/features/hiring/**"
+        "src/app/orders/**",
+        "src/features/orders/**"
       ]
     },
     {
-      "id": "campus",
-      "label": "Campus",
+      "id": "accounts",
+      "label": "Accounts",
       "paths": [
-        "src/app/campus/**",
-        "src/features/campus/**"
+        "src/app/accounts/**",
+        "src/features/accounts/**"
       ]
     }
   ]
