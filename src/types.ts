@@ -13,13 +13,15 @@ export type NodeKind =
   | 'module'
   | 'unknown';
 
+export type GraphMetadata = Record<string, string | number | boolean | null>;
+
 export interface ArchNode {
   id: string;
   label: string;
   kind: NodeKind;
   path?: string;
   health: HealthState;
-  metadata?: Record<string, string | number | boolean | null>;
+  metadata?: GraphMetadata;
 }
 
 export interface ArchEdge {
@@ -29,6 +31,7 @@ export interface ArchEdge {
   relation: 'contains' | 'imports' | 'calls' | 'reads' | 'writes' | 'depends-on' | 'integrates-with';
   health: HealthState;
   label?: string;
+  metadata?: GraphMetadata;
 }
 
 export interface ArchGraphData {
