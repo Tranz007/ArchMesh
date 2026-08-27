@@ -25,7 +25,8 @@
     "src/scanner/**/*.ts",
     "src/health/**/*.ts",
     "src/changes/**/*.ts",
-    "src/drift/**/*.ts"
+    "src/drift/**/*.ts",
+    "src/editor/**/*.ts"
   ],
   "exclude": ["src/**/*.test.ts"]
 }
