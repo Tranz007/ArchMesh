@@ -75,8 +75,8 @@ describe('scanProject', () => {
 
   it('detects Next.js page and API route semantics', async () => {
     const root = await fixture({
-      'src/app/(main)/hiring/candidates/[id]/page.tsx': `export default function Candidate(){ return null }`,
-      'src/app/api/hiring/candidates/[id]/route.ts': `export async function GET(){ return new Response('ok') }\nexport const POST = async () => new Response('created')`,
+      'src/app/(main)/orders/[id]/page.tsx': `export default function Order(){ return null }`,
+      'src/app/api/orders/[id]/route.ts': `export async function GET(){ return new Response('ok') }\nexport const POST = async () => new Response('created')`,
     });
 
     const graph = await scanProject(root);
@@ -85,12 +85,12 @@ describe('scanProject', () => {
 
     expect(page?.metadata).toMatchObject({
       framework: 'nextjs',
-      routePath: '/hiring/candidates/[id]',
+      routePath: '/orders/[id]',
       routeType: 'page',
     });
     expect(api?.metadata).toMatchObject({
       framework: 'nextjs',
-      routePath: '/api/hiring/candidates/[id]',
+      routePath: '/api/orders/[id]',
       routeType: 'api',
       httpMethods: 'GET, POST',
     });
@@ -98,13 +98,13 @@ describe('scanProject', () => {
 
   it('maps static internal fetch calls to API routes', async () => {
     const root = await fixture({
-      'src/app/story/page.tsx': `export async function publish(){ return fetch('/api/story/publish', { method: 'POST' }) }`,
-      'src/app/api/story/publish/route.ts': `export async function POST(){ return new Response('ok') }`,
+      'src/app/catalog/page.tsx': `export async function publish(){ return fetch('/api/catalog/publish', { method: 'POST' }) }`,
+      'src/app/api/catalog/publish/route.ts': `export async function POST(){ return new Response('ok') }`,
     });
 
     const graph = await scanProject(root);
-    const page = graph.nodes.find((node) => node.path === 'src/app/story/page.tsx');
-    const api = graph.nodes.find((node) => node.path === 'src/app/api/story/publish/route.ts');
+    const page = graph.nodes.find((node) => node.path === 'src/app/catalog/page.tsx');
+    const api = graph.nodes.find((node) => node.path === 'src/app/api/catalog/publish/route.ts');
 
     expect(graph.edges).toEqual(
       expect.arrayContaining([
@@ -112,7 +112,7 @@ describe('scanProject', () => {
           source: page?.id,
           target: api?.id,
           relation: 'calls',
-          label: 'POST /api/story/publish',
+          label: 'POST /api/catalog/publish',
         }),
       ]),
     );
@@ -137,26 +137,26 @@ describe('scanProject', () => {
 
   it('maps Firestore reads and writes to collection nodes', async () => {
     const root = await fixture({
-      'src/services/story.ts': `
+      'src/services/catalog.ts': `
         import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
-        export async function list(db){ return getDocs(collection(db, 'stories')) }
-        export async function save(db, id, value){ return setDoc(doc(db, 'stories', id), value) }
+        export async function list(db){ return getDocs(collection(db, 'products')) }
+        export async function save(db, id, value){ return setDoc(doc(db, 'products', id), value) }
       `,
     });
 
     const graph = await scanProject(root);
-    const service = graph.nodes.find((node) => node.path === 'src/services/story.ts');
-    const stories = graph.nodes.find((node) => node.id === 'data:firestore:stories');
+    const service = graph.nodes.find((node) => node.path === 'src/services/catalog.ts');
+    const products = graph.nodes.find((node) => node.id === 'data:firestore:products');
 
-    expect(stories?.metadata).toMatchObject({
+    expect(products?.metadata).toMatchObject({
       provider: 'Firebase',
       resourceType: 'Firestore collection',
-      collection: 'stories',
+      collection: 'products',
     });
     expect(graph.edges).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ source: service?.id, target: stories?.id, relation: 'reads' }),
-        expect.objectContaining({ source: service?.id, target: stories?.id, relation: 'writes' }),
+        expect.objectContaining({ source: service?.id, target: products?.id, relation: 'reads' }),
+        expect.objectContaining({ source: service?.id, target: products?.id, relation: 'writes' }),
       ]),
     );
   });
@@ -164,17 +164,17 @@ describe('scanProject', () => {
   it('marks configured product semantics on scanned nodes', async () => {
     const root = await fixture({
       'archmesh.config.json': JSON.stringify({
-        features: [{ id: 'story', label: 'Vetttd Story', paths: ['src/app/profile/**'] }],
+        features: [{ id: 'catalog', label: 'Product Catalog', paths: ['src/app/browse/**'] }],
       }),
-      'src/app/profile/page.tsx': `export default function Profile(){ return null }`,
+      'src/app/browse/page.tsx': `export default function Browse(){ return null }`,
     });
 
     const graph = await scanProject(root);
-    const profile = graph.nodes.find((node) => node.path === 'src/app/profile/page.tsx');
+    const browse = graph.nodes.find((node) => node.path === 'src/app/browse/page.tsx');
 
-    expect(profile?.metadata).toMatchObject({
-      featureKey: 'story',
-      featureLabel: 'Vetttd Story',
+    expect(browse?.metadata).toMatchObject({
+      featureKey: 'catalog',
+      featureLabel: 'Product Catalog',
       featureSource: 'config',
     });
   });
@@ -198,16 +198,16 @@ describe('scanProject', () => {
 
   it('detects server action directives', async () => {
     const root = await fixture({
-      'src/app/story/actions.ts': `'use server';\nexport async function publish(){ return true }`,
-      'src/app/hiring/actions.ts': `export async function save(){ 'use server'; return true }`,
+      'src/app/catalog/actions.ts': `'use server';\nexport async function publish(){ return true }`,
+      'src/app/orders/actions.ts': `export async function save(){ 'use server'; return true }`,
     });
 
     const graph = await scanProject(root);
-    const story = graph.nodes.find((node) => node.path === 'src/app/story/actions.ts');
-    const hiring = graph.nodes.find((node) => node.path === 'src/app/hiring/actions.ts');
+    const catalog = graph.nodes.find((node) => node.path === 'src/app/catalog/actions.ts');
+    const orders = graph.nodes.find((node) => node.path === 'src/app/orders/actions.ts');
 
-    expect(story?.metadata?.serverActionCount).toBe(1);
-    expect(hiring?.metadata?.serverActionCount).toBe(1);
+    expect(catalog?.metadata?.serverActionCount).toBe(1);
+    expect(orders?.metadata?.serverActionCount).toBe(1);
   });
 
   it('ignores generated and dependency directories', async () => {

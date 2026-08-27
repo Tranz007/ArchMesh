@@ -18,7 +18,7 @@ describe('ArchMesh config', () => {
       path.join(root, 'archmesh.config.json'),
       JSON.stringify({
         features: [
-          { id: 'story', label: 'Vetttd Story', paths: ['src/app/story/**', 'src/features/story/**'] },
+          { id: 'catalog', label: 'Product Catalog', paths: ['src/app/catalog/**', 'src/features/catalog/**'] },
         ],
       }),
       'utf8',
@@ -26,11 +26,11 @@ describe('ArchMesh config', () => {
 
     const config = await loadArchMeshConfig(root);
 
-    expect(configuredFeatureForPath('src/app/story/[id]/page.tsx', config)).toEqual({
-      key: 'story',
-      label: 'Vetttd Story',
+    expect(configuredFeatureForPath('src/app/catalog/[id]/page.tsx', config)).toEqual({
+      key: 'catalog',
+      label: 'Product Catalog',
     });
-    expect(configuredFeatureForPath('src/app/hiring/page.tsx', config)).toBeUndefined();
+    expect(configuredFeatureForPath('src/app/orders/page.tsx', config)).toBeUndefined();
   });
 
   it('fails clearly when the config file contains invalid JSON', async () => {

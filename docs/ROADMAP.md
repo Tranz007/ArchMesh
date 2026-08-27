@@ -2,6 +2,8 @@
 
 The roadmap is organized around product capability, not calendar promises. Sequence can change as real codebases expose what matters most.
 
+The release boundary is defined in [`DEFINITION_OF_DONE.md`](DEFINITION_OF_DONE.md). Work that does not close a v0.1 release gate should not delay v0.1.
+
 ## Slice 1 — Local visual architecture
 
 Status: **complete baseline**
@@ -34,17 +36,16 @@ Delivered:
 - explicit provenance for configured versus detected feature semantics;
 - feature/product change-state aggregation from exact source impact.
 
-Remaining:
+Remaining before or near v0.1:
 
-- stronger React component semantics beyond imports;
-- workspace/package resolution;
-- large-repository clustering and progressive levels of detail;
 - source-editor navigation;
-- further layout stability/performance work.
+- workspace/package resolution where needed for common monorepos;
+- large-repository progressive detail;
+- measured layout stability/performance improvements.
 
 ## Slice 3 — Data and integration topology
 
-Status: **in progress**
+Status: **working baseline delivered**
 
 Delivered:
 
@@ -54,12 +55,14 @@ Delivered:
 - dedicated Topology view;
 - first-class Firebase, Stripe, OpenAI, WorkOS, Resend, Vercel, and HTTP-host nodes.
 
-Remaining:
+Post-baseline expansion:
 
 - richer Stripe webhook/billing semantics;
 - WorkOS/Resend/OpenAI-specific operation semantics;
 - Firebase Auth/Storage/Functions topology;
 - additional evidence/provenance metadata for semantic adapters.
+
+These enrichments should not delay v0.1 unless representative repositories show the baseline topology is not useful without them.
 
 ## Slice 4 — Change impact
 
@@ -73,18 +76,19 @@ Delivered:
 - reverse-dependency traversal;
 - dedicated Changes view;
 - change-state inspector explanations;
-- feature-level change aggregation in Architecture view;
-- product-level change aggregation;
-- direct changed/affected member counts on feature nodes;
+- feature-level and product-level change aggregation;
+- changed/affected member counts;
 - cross-feature relationship change propagation;
 - health remains independent from change state.
 
 Remaining:
 
-- bounded traversal controls;
+- bounded traversal controls if large-repo testing proves necessary;
 - persisted graph comparisons across commits/snapshots;
 - richer Git status/commit context;
 - change history and change-to-failure correlation.
+
+Persisted history is post-v0.1 unless needed to satisfy core usability testing.
 
 ## Slice 5 — Local health
 
@@ -100,10 +104,13 @@ Delivered:
 - evidence preservation through graph projections;
 - errors-only workflow backed by real signals.
 
-Remaining:
+Remaining before/near v0.1:
 
-- test failure adapters;
-- Next.js/Vite build-error adapters;
+- at least one representative test/build failure adapter if needed to validate the general health contract;
+- stronger error-state UX and fixtures across supported workflows.
+
+Later adapters:
+
 - browser/runtime development errors;
 - failed local HTTP request ingestion;
 - lint/static-analysis warnings where materially useful.
@@ -118,71 +125,81 @@ Delivered:
 - debounced and serialized rebuilds;
 - generated/vendor path filtering;
 - shared graph-build pipeline;
-- viewer updates through a custom Vite event without a full page reload;
+- viewer updates without a full page reload;
 - active graph view preserved across refreshes;
 - node/edge selection preserved when identity still exists;
 - graph-to-graph architecture drift between consecutive successful scans;
 - separate `added`, `removed`, `modified`, and `stable` drift states;
 - dedicated Drift view with one-hop stable context;
 - removed historical nodes/connections preserved as selectable ghost entities;
-- local `archmesh-drift.json` output reset at watch-session start;
+- local drift output reset at watch-session start;
 - structural drift fingerprints that ignore health/change overlays.
 
-Remaining:
+Remaining before v0.1:
 
-- incremental scanning instead of full rescans;
-- content hashing and adapter-level invalidation;
-- graph deltas instead of whole-graph replacement;
-- architecture-change animation/highlighting across refreshes;
+- benchmark watch performance on representative repositories;
+- implement incremental scanning/content hashing/graph deltas only to the extent needed to meet the documented performance target;
+- validate watch behavior on supported operating systems.
+
+Later:
+
+- animation/highlighting across refreshes;
 - persisted snapshot history and recent-change timeline.
 
-## Slice 7 — Optional production telemetry
+## Slice 7 — Portable developer tool
 
-Status: **planned**
-
-Goals:
-
-- pluggable runtime event interface;
-- optional Vercel/Firebase/PostHog/Stripe/OTel adapters;
-- configurable retention/history;
-- no requirement for a hosted ArchMesh backend.
-
-## Slice 8 — Portable developer tool
-
-Status: **planned / partially underway**
+Status: **required for v0.1**
 
 Goals:
 
 - package/CLI experience approaching `npx archmesh .`;
-- first-run project setup;
-- `.archmesh/` project semantics and state;
-- adapter/plugin contracts;
-- public sample projects and fixtures;
-- installation/update documentation;
-- performance work for large repositories.
+- ordinary use without cloning the ArchMesh repository;
+- clear first-run failures and help output;
+- documented package/versioning flow;
+- clean-install smoke test;
+- supported Node-version policy;
+- operating-system compatibility checks;
+- public sample/fixture repository for end-to-end validation.
 
-## Near-term priorities
+## Slice 8 — Release usability and scale
 
-1. Incremental scanning, content hashing, and graph deltas for watch mode.
-2. Large-repository progressive disclosure and layout stability.
-3. Source-editor navigation from graph entities.
-4. More useful platform semantics for Firebase, Stripe, OpenAI, WorkOS, and Resend.
-5. Test/build/browser/runtime health adapters.
-6. Persisted snapshots, Git history, and change-to-failure correlation.
-7. Performance testing on genuinely large repositories.
-8. Packaging toward a one-command install/run experience.
+Status: **required for v0.1**
 
-## Later possibilities
+Goals:
 
-These are ideas, not commitments:
+- source-editor navigation from scanned entities;
+- representative small/medium/large repository benchmarks;
+- progressive detail that avoids an unusable default file hairball;
+- stable identity/layout checks across rescans;
+- narrow viewport and accessibility review of all primary views;
+- end-to-end fixture covering Architecture, Topology, Changes, Drift, Code, and Health;
+- README/install docs verified from a clean environment.
 
+## Post-v0.1 platform work
+
+These are deliberately outside the first release boundary unless user evidence changes the decision:
+
+- production telemetry connectors;
+- Vercel/Firebase/PostHog/Stripe/OTel hosted integrations;
+- collaboration/team annotations;
 - cross-repository/system graphs;
-- team annotations;
-- architectural rules and drift detection;
+- architectural policy/rule enforcement;
 - MCP tools for AI coding agents;
 - natural-language graph filtering;
-- generated architecture summaries/diagrams;
+- generated architecture summaries;
 - desktop packaging;
-- optional collaboration/server mode.
+- optional collaboration/server mode;
+- broad language/framework coverage.
 
-The core local visual experience should remain useful even if none of these are built.
+## Near-term v0.1 sequence
+
+1. Package the CLI so ArchMesh can run without cloning this repository.
+2. Add source-editor navigation from the inspector.
+3. Build a representative end-to-end fixture and smoke-test path.
+4. Add cross-platform CI/support validation.
+5. Benchmark scan/watch performance and implement incremental invalidation where measurements require it.
+6. Improve progressive detail/layout stability on larger repositories.
+7. Validate accessibility and all primary empty/error states.
+8. Cut v0.1 when the gates in `DEFINITION_OF_DONE.md` are satisfied.
+
+The release decision should be gate-driven, not roadmap-length-driven.
