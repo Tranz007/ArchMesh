@@ -7,12 +7,14 @@ import {
   Boxes,
   CircleDot,
   Code2,
+  Database,
   Network,
   Search,
   XCircle,
 } from 'lucide-react';
 import { GraphCanvas } from './GraphCanvas';
 import { projectArchitecture } from './projections/architecture';
+import { projectTopology } from './projections/topology';
 import { sampleGraph } from './sample-graph';
 import type { ArchEdge, ArchGraphData, ArchNode, HealthState } from './types';
 
@@ -24,7 +26,7 @@ const healthLabel: Record<HealthState, string> = {
   unknown: 'Unknown',
 };
 
-type ViewMode = 'architecture' | 'code';
+type ViewMode = 'architecture' | 'topology' | 'code';
 
 interface ConnectionListProps {
   title: string;
@@ -94,11 +96,14 @@ export default function App() {
     () => projectArchitecture(data, focusedFeatureId),
     [data, focusedFeatureId],
   );
+  const topologyProjection = useMemo(() => projectTopology(data), [data]);
 
   const visibleData = useMemo(() => {
     if (source === 'demo') return data;
-    return viewMode === 'architecture' ? architectureProjection.graph : data;
-  }, [architectureProjection.graph, data, source, viewMode]);
+    if (viewMode === 'architecture') return architectureProjection.graph;
+    if (viewMode === 'topology') return topologyProjection;
+    return data;
+  }, [architectureProjection.graph, data, source, topologyProjection, viewMode]);
 
   const selectNode = useCallback((nodeId?: string) => setSelectedNodeId(nodeId), []);
 
@@ -138,7 +143,7 @@ export default function App() {
     setViewMode(mode);
     setSelectedNodeId(undefined);
     setErrorsOnly(false);
-    if (mode === 'code') setFocusedFeatureId(undefined);
+    if (mode !== 'architecture') setFocusedFeatureId(undefined);
   };
 
   const focusedFeature = architectureProjection.graph.nodes.find(
@@ -149,6 +154,14 @@ export default function App() {
   const routePath = selectedNode?.metadata?.routePath;
   const httpMethods = selectedNode?.metadata?.httpMethods;
   const serverActionCount = selectedNode?.metadata?.serverActionCount;
+  const provider = selectedNode?.metadata?.provider;
+  const resourceType = selectedNode?.metadata?.resourceType;
+
+  const searchPlaceholder = viewMode === 'architecture'
+    ? 'Find a feature, integration, service…'
+    : viewMode === 'topology'
+      ? 'Find a feature, collection, integration…'
+      : 'Find a route, component, file…';
 
   return (
     <main className="app-shell">
@@ -174,7 +187,7 @@ export default function App() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={viewMode === 'architecture' ? 'Find a feature, integration, service…' : 'Find a route, component, file…'}
+            placeholder={searchPlaceholder}
             aria-label="Search architecture"
           />
           {matches.length > 0 && (
@@ -201,6 +214,13 @@ export default function App() {
                 onClick={() => changeView('architecture')}
               >
                 <Network size={14} /> Architecture
+              </button>
+              <button
+                type="button"
+                className={viewMode === 'topology' ? 'selected' : ''}
+                onClick={() => changeView('topology')}
+              >
+                <Database size={14} /> Topology
               </button>
               <button
                 type="button"
@@ -262,11 +282,13 @@ export default function App() {
               <div className={`health-badge ${selectedNode.health}`}>{healthLabel[selectedNode.health]}</div>
               {selectedNode.path && <code className="path">{selectedNode.path}</code>}
 
-              {(routePath || httpMethods || serverActionCount || semanticSource) && (
+              {(routePath || httpMethods || serverActionCount || semanticSource || provider || resourceType) && (
                 <dl className="entity-facts">
                   {routePath && <div><dt>Route</dt><dd>{String(routePath)}</dd></div>}
                   {httpMethods && <div><dt>Methods</dt><dd>{String(httpMethods)}</dd></div>}
                   {serverActionCount && <div><dt>Server actions</dt><dd>{String(serverActionCount)}</dd></div>}
+                  {provider && <div><dt>Provider</dt><dd>{String(provider)}</dd></div>}
+                  {resourceType && <div><dt>Resource</dt><dd>{String(resourceType)}</dd></div>}
                   {semanticSource && <div><dt>Grouping</dt><dd>{semanticSource === 'config' ? 'Project config' : 'Detected'}</dd></div>}
                 </dl>
               )}
@@ -313,11 +335,19 @@ export default function App() {
           ) : (
             <div className="empty-inspector">
               <Boxes size={34} />
-              <h2>{viewMode === 'architecture' ? 'Explore the system' : 'Inspect the code graph'}</h2>
+              <h2>
+                {viewMode === 'architecture'
+                  ? 'Explore the system'
+                  : viewMode === 'topology'
+                    ? 'Explore data and integrations'
+                    : 'Inspect the code graph'}
+              </h2>
               <p>
                 {viewMode === 'architecture'
                   ? 'Select a feature or integration to understand the human architecture, then drill into a feature when you need code-level detail.'
-                  : 'Select a node to isolate its immediate dependencies and inspect the exact scanned code relationships.'}
+                  : viewMode === 'topology'
+                    ? 'See which product areas read or write data and which external systems they call without showing every implementation file.'
+                    : 'Select a node to isolate its immediate dependencies and inspect the exact scanned code relationships.'}
               </p>
               <p className="muted">Red connections are failures. Orange connections represent downstream impact.</p>
             </div>
