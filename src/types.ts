@@ -1,4 +1,5 @@
 export type HealthState = 'healthy' | 'warning' | 'error' | 'impacted' | 'unknown';
+export type ChangeState = 'unchanged' | 'changed' | 'affected';
 
 export type NodeKind =
   | 'product'
@@ -21,6 +22,7 @@ export interface ArchNode {
   kind: NodeKind;
   path?: string;
   health: HealthState;
+  change?: ChangeState;
   metadata?: GraphMetadata;
 }
 
@@ -30,6 +32,7 @@ export interface ArchEdge {
   target: string;
   relation: 'contains' | 'imports' | 'calls' | 'reads' | 'writes' | 'depends-on' | 'integrates-with';
   health: HealthState;
+  change?: ChangeState;
   label?: string;
   metadata?: GraphMetadata;
 }
