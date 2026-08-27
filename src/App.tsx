@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowDownRight,
   ArrowLeft,
+  ArrowUpLeft,
   Boxes,
   CircleDot,
   Code2,
@@ -12,7 +14,7 @@ import {
 import { GraphCanvas } from './GraphCanvas';
 import { projectArchitecture } from './projections/architecture';
 import { sampleGraph } from './sample-graph';
-import type { ArchGraphData, ArchNode, HealthState } from './types';
+import type { ArchEdge, ArchGraphData, ArchNode, HealthState } from './types';
 
 const healthLabel: Record<HealthState, string> = {
   healthy: 'Healthy',
@@ -23,6 +25,43 @@ const healthLabel: Record<HealthState, string> = {
 };
 
 type ViewMode = 'architecture' | 'code';
+
+interface ConnectionListProps {
+  title: string;
+  icon: 'outbound' | 'inbound';
+  edges: ArchEdge[];
+  selectedNodeId: string;
+  data: ArchGraphData;
+  onSelect: (nodeId: string) => void;
+}
+
+function ConnectionList({ title, icon, edges, selectedNodeId, data, onSelect }: ConnectionListProps) {
+  return (
+    <section className="connection-section">
+      <h3>
+        {icon === 'outbound' ? <ArrowDownRight size={13} /> : <ArrowUpLeft size={13} />}
+        {title}
+        <span>{edges.length}</span>
+      </h3>
+      <div className="connection-list">
+        {edges.length === 0 && <p className="muted">None detected.</p>}
+        {edges.map((edge) => {
+          const otherId = edge.source === selectedNodeId ? edge.target : edge.source;
+          const other = data.nodes.find((node) => node.id === otherId);
+          return (
+            <button key={edge.id} type="button" onClick={() => onSelect(otherId)}>
+              <span className={`edge-state ${edge.health}`} />
+              <span className="connection-copy">
+                <strong>{other?.label ?? otherId}</strong>
+                <small>{edge.relation}{edge.label ? ` · ${edge.label}` : ''}</small>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 export default function App() {
   const [data, setData] = useState<ArchGraphData>(sampleGraph);
@@ -68,11 +107,12 @@ export default function App() {
     [visibleData.nodes, selectedNodeId],
   );
 
-  const selectedEdges = useMemo(() => {
-    if (!selectedNodeId) return [];
-    return visibleData.edges.filter(
-      (edge) => edge.source === selectedNodeId || edge.target === selectedNodeId,
-    );
+  const selectedConnections = useMemo(() => {
+    if (!selectedNodeId) return { outbound: [], inbound: [] };
+    return {
+      outbound: visibleData.edges.filter((edge) => edge.source === selectedNodeId),
+      inbound: visibleData.edges.filter((edge) => edge.target === selectedNodeId),
+    };
   }, [visibleData.edges, selectedNodeId]);
 
   const matches = useMemo(() => {
@@ -104,6 +144,11 @@ export default function App() {
   const focusedFeature = architectureProjection.graph.nodes.find(
     (node) => node.id === focusedFeatureId,
   );
+
+  const semanticSource = selectedNode?.metadata?.semanticSource;
+  const routePath = selectedNode?.metadata?.routePath;
+  const httpMethods = selectedNode?.metadata?.httpMethods;
+  const serverActionCount = selectedNode?.metadata?.serverActionCount;
 
   return (
     <main className="app-shell">
@@ -217,6 +262,15 @@ export default function App() {
               <div className={`health-badge ${selectedNode.health}`}>{healthLabel[selectedNode.health]}</div>
               {selectedNode.path && <code className="path">{selectedNode.path}</code>}
 
+              {(routePath || httpMethods || serverActionCount || semanticSource) && (
+                <dl className="entity-facts">
+                  {routePath && <div><dt>Route</dt><dd>{String(routePath)}</dd></div>}
+                  {httpMethods && <div><dt>Methods</dt><dd>{String(httpMethods)}</dd></div>}
+                  {serverActionCount && <div><dt>Server actions</dt><dd>{String(serverActionCount)}</dd></div>}
+                  {semanticSource && <div><dt>Grouping</dt><dd>{semanticSource === 'config' ? 'Project config' : 'Detected'}</dd></div>}
+                </dl>
+              )}
+
               {selectedNode.kind === 'feature' && selectedNode.metadata?.memberCount && (
                 <div className="metadata-grid" aria-label="Feature contents">
                   <div><strong>{selectedNode.metadata.memberCount}</strong><span>Files</span></div>
@@ -239,23 +293,22 @@ export default function App() {
                 </button>
               )}
 
-              <h3>Connections</h3>
-              <div className="connection-list">
-                {selectedEdges.length === 0 && <p className="muted">No direct connections.</p>}
-                {selectedEdges.map((edge) => {
-                  const otherId = edge.source === selectedNode.id ? edge.target : edge.source;
-                  const other = visibleData.nodes.find((node) => node.id === otherId);
-                  return (
-                    <button key={edge.id} type="button" onClick={() => setSelectedNodeId(otherId)}>
-                      <span className={`edge-state ${edge.health}`} />
-                      <span className="connection-copy">
-                        <strong>{other?.label ?? otherId}</strong>
-                        <small>{edge.relation}{edge.label ? ` · ${edge.label}` : ''}</small>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              <ConnectionList
+                title="Depends on"
+                icon="outbound"
+                edges={selectedConnections.outbound}
+                selectedNodeId={selectedNode.id}
+                data={visibleData}
+                onSelect={setSelectedNodeId}
+              />
+              <ConnectionList
+                title="Depended on by"
+                icon="inbound"
+                edges={selectedConnections.inbound}
+                selectedNodeId={selectedNode.id}
+                data={visibleData}
+                onSelect={setSelectedNodeId}
+              />
             </>
           ) : (
             <div className="empty-inspector">
