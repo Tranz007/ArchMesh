@@ -73,19 +73,21 @@ export function projectSystemOverview(data: ArchGraphData, maxFeatures = 26, max
   const priorityFeatures = features
     .filter((node) => node.health !== 'healthy' || node.change === 'changed' || node.change === 'affected')
     .sort((a, b) => featureImportance(b, degree) - featureImportance(a, degree));
-  const rankedFeatures = [...features].sort((a, b) => featureImportance(b, degree) - featureImportance(a, degree));
+  const priorityIds = new Set(priorityFeatures.map((node) => node.id));
+  const rankedNormalFeatures = features
+    .filter((node) => !priorityIds.has(node.id))
+    .sort((a, b) => featureImportance(b, degree) - featureImportance(a, degree));
 
-  const featureIds = new Set<string>();
-  for (const feature of [...priorityFeatures, ...rankedFeatures]) {
-    if (featureIds.size >= maxFeatures && feature.health === 'healthy' && feature.change !== 'changed') continue;
+  const featureIds = new Set<string>(priorityIds);
+  for (const feature of rankedNormalFeatures.slice(0, maxFeatures)) {
     featureIds.add(feature.id);
-    if (featureIds.size >= maxFeatures && priorityFeatures.every((item) => featureIds.has(item.id))) break;
   }
 
+  const integrationIds = new Set(integrations.map((node) => node.id));
   const connectedIntegrationIds = new Set<string>();
   for (const edge of data.edges) {
-    if (featureIds.has(edge.source) && integrations.some((node) => node.id === edge.target)) connectedIntegrationIds.add(edge.target);
-    if (featureIds.has(edge.target) && integrations.some((node) => node.id === edge.source)) connectedIntegrationIds.add(edge.source);
+    if (featureIds.has(edge.source) && integrationIds.has(edge.target)) connectedIntegrationIds.add(edge.target);
+    if (featureIds.has(edge.target) && integrationIds.has(edge.source)) connectedIntegrationIds.add(edge.source);
   }
 
   const rankedIntegrations = integrations
