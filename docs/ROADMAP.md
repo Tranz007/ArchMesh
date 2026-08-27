@@ -82,9 +82,8 @@ Delivered:
 Remaining:
 
 - bounded traversal controls;
-- graph comparisons between persisted scans/commits;
+- persisted graph comparisons across commits/snapshots;
 - richer Git status/commit context;
-- architecture drift visualization;
 - change history and change-to-failure correlation.
 
 ## Slice 5 — Local health
@@ -121,15 +120,21 @@ Delivered:
 - shared graph-build pipeline;
 - viewer updates through a custom Vite event without a full page reload;
 - active graph view preserved across refreshes;
-- node/edge selection preserved when identity still exists.
+- node/edge selection preserved when identity still exists;
+- graph-to-graph architecture drift between consecutive successful scans;
+- separate `added`, `removed`, `modified`, and `stable` drift states;
+- dedicated Drift view with one-hop stable context;
+- removed historical nodes/connections preserved as selectable ghost entities;
+- local `archmesh-drift.json` output reset at watch-session start;
+- structural drift fingerprints that ignore health/change overlays.
 
 Remaining:
 
 - incremental scanning instead of full rescans;
 - content hashing and adapter-level invalidation;
-- graph deltas;
-- architecture-change animation/highlighting;
-- recent-change timeline.
+- graph deltas instead of whole-graph replacement;
+- architecture-change animation/highlighting across refreshes;
+- persisted snapshot history and recent-change timeline.
 
 ## Slice 7 — Optional production telemetry
 
@@ -158,13 +163,14 @@ Goals:
 
 ## Near-term priorities
 
-1. Architecture drift and graph-to-graph comparison.
-2. Incremental scanning and graph deltas for watch mode.
-3. More useful platform semantics for Firebase, Stripe, OpenAI, WorkOS, and Resend.
-4. Test/build/runtime failure adapters.
-5. Source-editor navigation from graph entities.
-6. Performance testing on genuinely large repositories.
-7. Packaging toward a one-command install/run experience.
+1. Incremental scanning, content hashing, and graph deltas for watch mode.
+2. Large-repository progressive disclosure and layout stability.
+3. Source-editor navigation from graph entities.
+4. More useful platform semantics for Firebase, Stripe, OpenAI, WorkOS, and Resend.
+5. Test/build/browser/runtime health adapters.
+6. Persisted snapshots, Git history, and change-to-failure correlation.
+7. Performance testing on genuinely large repositories.
+8. Packaging toward a one-command install/run experience.
 
 ## Later possibilities
 
