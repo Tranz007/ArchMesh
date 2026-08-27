@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import Graph from 'graphology';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import Sigma from 'sigma';
-import type { ArchGraphData, HealthState } from './types';
+import type { ArchGraphData, ChangeState, HealthState } from './types';
 
 const healthColor: Record<HealthState, string> = {
   healthy: '#7f8da8',
@@ -10,6 +10,12 @@ const healthColor: Record<HealthState, string> = {
   error: '#ff4d5e',
   impacted: '#ff8f70',
   unknown: '#667085',
+};
+
+const changeColor: Record<ChangeState, string> = {
+  unchanged: '#7f8da8',
+  changed: '#58a6ff',
+  affected: '#a78bfa',
 };
 
 const kindSize: Record<string, number> = {
@@ -33,6 +39,12 @@ function stableCoordinate(id: string, salt: number) {
     hash = Math.imul(hash, 16777619);
   }
   return ((hash >>> 0) % 10000) / 10000;
+}
+
+function graphColor(health: HealthState, change: ChangeState | undefined, healthyDefault: string) {
+  if (health === 'error' || health === 'warning' || health === 'impacted') return healthColor[health];
+  if (change === 'changed' || change === 'affected') return changeColor[change];
+  return healthyDefault;
 }
 
 interface GraphCanvasProps {
@@ -80,11 +92,12 @@ export function GraphCanvas({
         label: node.label,
         kind: node.kind,
         health: node.health,
+        change: node.change ?? 'unchanged',
         path: node.path,
         x: stableCoordinate(node.id, 17),
         y: stableCoordinate(node.id, 71),
-        size: kindSize[node.kind] ?? 7,
-        color: healthColor[node.health],
+        size: (kindSize[node.kind] ?? 7) * (node.change === 'changed' ? 1.12 : 1),
+        color: graphColor(node.health, node.change, healthColor[node.health]),
       });
     }
 
@@ -95,8 +108,15 @@ export function GraphCanvas({
         label: edge.label ?? edge.relation,
         relation: edge.relation,
         health: edge.health,
-        size: edge.health === 'error' ? 3 : edge.health === 'impacted' ? 2 : 1,
-        color: edge.health === 'healthy' ? '#38445b' : healthColor[edge.health],
+        change: edge.change ?? 'unchanged',
+        size: edge.health === 'error'
+          ? 3
+          : edge.health === 'impacted'
+            ? 2
+            : edge.change === 'affected'
+              ? 1.8
+              : 1,
+        color: graphColor(edge.health, edge.change, '#38445b'),
       });
     }
 
