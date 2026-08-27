@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ForceGraph3D, { type ForceGraphMethods } from 'react-force-graph-3d';
-import { Group } from 'three';
+import {
+  BoxGeometry,
+  BufferGeometry,
+  CylinderGeometry,
+  DodecahedronGeometry,
+  Group,
+  IcosahedronGeometry,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  OctahedronGeometry,
+  SphereGeometry,
+  TetrahedronGeometry,
+} from 'three';
 import SpriteText from 'three-spritetext';
 import type {
   ArchGraphData,
@@ -30,6 +43,20 @@ const driftColor: Record<DriftState, string> = {
   modified: '#fbbf24',
 };
 
+export const semanticKindColor: Record<string, string> = {
+  product: '#d6e2f5',
+  feature: '#6f95d8',
+  integration: '#a178d0',
+  api: '#53a8c7',
+  service: '#8778d2',
+  route: '#7d9bc3',
+  component: '#718096',
+  data: '#4fae92',
+  file: '#556175',
+  module: '#6b7280',
+  unknown: '#667085',
+};
+
 const kindValue: Record<string, number> = {
   product: 20,
   feature: 10,
@@ -42,6 +69,34 @@ const kindValue: Record<string, number> = {
   file: 2,
   module: 2,
   unknown: 3,
+};
+
+const kindRadius: Record<string, number> = {
+  product: 6.2,
+  feature: 4.2,
+  integration: 4.1,
+  api: 3.7,
+  service: 3.8,
+  route: 3.2,
+  component: 2.6,
+  data: 4,
+  file: 1.8,
+  module: 2.2,
+  unknown: 2.4,
+};
+
+const shellRadius: Record<string, number> = {
+  product: 0,
+  feature: 70,
+  api: 104,
+  service: 108,
+  route: 112,
+  component: 126,
+  file: 138,
+  module: 128,
+  data: 148,
+  integration: 158,
+  unknown: 132,
 };
 
 const alwaysLabelKinds = new Set([
@@ -66,6 +121,9 @@ interface RenderNode {
   x: number;
   y: number;
   z: number;
+  fx?: number;
+  fy?: number;
+  fz?: number;
 }
 
 interface RenderLink {
@@ -89,8 +147,21 @@ function stableCoordinate(id: string, salt: number) {
   return ((hash >>> 0) % 10000) / 10000;
 }
 
-function seededAxis(id: string, salt: number) {
-  return (stableCoordinate(id, salt) - 0.5) * 140;
+function semanticPosition(id: string, kind: string) {
+  const radius = shellRadius[kind] ?? 132;
+  if (radius === 0) return { x: 0, y: 0, z: 0 };
+
+  const theta = stableCoordinate(id, 17) * Math.PI * 2;
+  const cosPhi = stableCoordinate(id, 71) * 2 - 1;
+  const phi = Math.acos(Math.max(-1, Math.min(1, cosPhi)));
+  const jitter = (stableCoordinate(id, 137) - 0.5) * 18;
+  const r = radius + jitter;
+
+  return {
+    x: r * Math.sin(phi) * Math.cos(theta),
+    y: r * Math.cos(phi),
+    z: r * Math.sin(phi) * Math.sin(theta),
+  };
 }
 
 function graphColor(
@@ -106,8 +177,39 @@ function graphColor(
   return healthyDefault;
 }
 
+function nodeColor(kind: string, health: HealthState, drift: DriftState, visualMode: 'default' | 'drift') {
+  if (visualMode === 'drift') return driftColor[drift];
+  if (health === 'error' || health === 'warning' || health === 'impacted') return healthColor[health];
+  return semanticKindColor[kind] ?? semanticKindColor.unknown;
+}
+
 function endpointId(endpoint: string | RenderNode) {
   return typeof endpoint === 'string' ? endpoint : endpoint.id;
+}
+
+function geometryForKind(kind: string, radius: number): BufferGeometry {
+  switch (kind) {
+    case 'product':
+      return new IcosahedronGeometry(radius, 1);
+    case 'feature':
+      return new SphereGeometry(radius, 20, 14);
+    case 'integration':
+      return new OctahedronGeometry(radius, 0);
+    case 'data':
+      return new CylinderGeometry(radius * 0.8, radius * 0.8, radius * 1.55, 18);
+    case 'api':
+      return new BoxGeometry(radius * 1.45, radius * 1.45, radius * 1.45);
+    case 'service':
+      return new DodecahedronGeometry(radius, 0);
+    case 'route':
+      return new BoxGeometry(radius * 1.75, radius * 0.76, radius * 0.76);
+    case 'component':
+      return new BoxGeometry(radius * 1.25, radius * 1.25, radius * 0.58);
+    case 'module':
+      return new TetrahedronGeometry(radius, 0);
+    default:
+      return new SphereGeometry(radius, 12, 9);
+  }
 }
 
 interface GraphCanvasProps {
@@ -182,6 +284,8 @@ export function GraphCanvas({
                 ? 1.1
                 : 1
           : 1;
+        const position = semanticPosition(node.id, node.kind);
+        const fixed = node.kind === 'product' ? { fx: 0, fy: 0, fz: 0 } : {};
 
         return {
           id: node.id,
@@ -192,10 +296,9 @@ export function GraphCanvas({
           drift,
           path: node.path,
           value: (kindValue[node.kind] ?? 3) * (node.change === 'changed' ? 1.12 : 1) * driftScale,
-          baseColor: graphColor(node.health, node.change, node.drift, healthColor[node.health], visualMode),
-          x: seededAxis(node.id, 17),
-          y: seededAxis(node.id, 71),
-          z: seededAxis(node.id, 137),
+          baseColor: nodeColor(node.kind, node.health, drift, visualMode),
+          ...position,
+          ...fixed,
         };
       });
 
@@ -212,7 +315,7 @@ export function GraphCanvas({
         health: edge.health,
         change: edge.change ?? 'unchanged',
         drift: edge.drift ?? 'stable',
-        baseColor: graphColor(edge.health, edge.change, edge.drift, '#38445b', visualMode),
+        baseColor: graphColor(edge.health, edge.change, edge.drift, '#3c4960', visualMode),
       }));
 
     return { nodes, links };
@@ -254,6 +357,11 @@ export function GraphCanvas({
     [errorsOnly, graphData.nodes, visualMode],
   );
 
+  const fitGraph = () => {
+    fittedGraphRef.current = graphIdentity;
+    graphRef.current?.zoomToFit(450, 72);
+  };
+
   return (
     <div ref={containerRef} className="graph-canvas graph-canvas-3d" aria-label="Interactive 3D architecture graph">
       <ForceGraph3D
@@ -268,23 +376,10 @@ export function GraphCanvas({
         showNavInfo={false}
         numDimensions={3}
         forceEngine="d3"
-        warmupTicks={60}
-        cooldownTicks={150}
-        cooldownTime={4500}
-        d3VelocityDecay={0.34}
-        nodeRelSize={1.55}
-        nodeVal={(node) => {
-          const typedNode = node as RenderNode;
-          const selected = typedNode.id === selectedNodeId;
-          const edgeEndpoint = selection.edgeEndpoints?.has(typedNode.id) ?? false;
-          return typedNode.value * (selected ? 1.8 : edgeEndpoint ? 1.45 : 1);
-        }}
-        nodeColor={(node) => {
-          const typedNode = node as RenderNode;
-          return isNodeFaded(typedNode) ? '#273147' : typedNode.baseColor;
-        }}
-        nodeOpacity={0.94}
-        nodeResolution={14}
+        warmupTicks={50}
+        cooldownTicks={130}
+        cooldownTime={4000}
+        d3VelocityDecay={0.37}
         nodeLabel={(node) => {
           const typedNode = node as RenderNode;
           return `${typedNode.label} · ${typedNode.kind}`;
@@ -295,44 +390,80 @@ export function GraphCanvas({
           const faded = isNodeFaded(typedNode);
           const selected = typedNode.id === selectedNodeId;
           const edgeEndpoint = selection.edgeEndpoints?.has(typedNode.id) ?? false;
-          const showLabel = !faded && (selected || edgeEndpoint || alwaysLabelKinds.has(typedNode.kind));
-          if (!showLabel) return group;
+          const radius = kindRadius[typedNode.kind] ?? kindRadius.unknown;
+          const scale = selected ? 1.32 : edgeEndpoint ? 1.18 : 1;
+          group.scale.setScalar(scale);
 
-          const sprite = new SpriteText(
-            typedNode.label,
-            selected ? 4.8 : edgeEndpoint ? 4.2 : 3.3,
-            selected ? '#ffffff' : '#dbe6f8',
-          );
-          sprite.backgroundColor = 'rgba(9, 13, 23, 0.78)';
-          sprite.padding = [3, 2];
-          sprite.borderRadius = 4;
-          sprite.fontFace = 'Inter, Arial, sans-serif';
-          sprite.fontWeight = selected ? '700' : '500';
-          sprite.material.depthTest = false;
-          sprite.renderOrder = 1000;
-          sprite.position.y = 5 + Math.cbrt(typedNode.value) * 1.6;
-          group.add(sprite);
+          const material = new MeshStandardMaterial({
+            color: faded ? '#273147' : typedNode.baseColor,
+            roughness: 0.5,
+            metalness: typedNode.kind === 'integration' || typedNode.kind === 'product' ? 0.28 : 0.12,
+            transparent: faded,
+            opacity: faded ? 0.22 : 0.96,
+            emissive: typedNode.health === 'error' || typedNode.health === 'warning' || typedNode.health === 'impacted'
+              ? healthColor[typedNode.health]
+              : selected ? '#263d63' : '#000000',
+            emissiveIntensity: typedNode.health === 'error'
+              ? 0.8
+              : typedNode.health === 'warning' || typedNode.health === 'impacted'
+                ? 0.52
+                : selected ? 0.4 : 0,
+          });
+          const mesh = new Mesh(geometryForKind(typedNode.kind, radius), material);
+          group.add(mesh);
+
+          if (!faded && visualMode !== 'drift' && (typedNode.change === 'changed' || typedNode.change === 'affected')) {
+            const shell = new Mesh(
+              new SphereGeometry(radius * 1.28, 12, 9),
+              new MeshBasicMaterial({
+                color: changeColor[typedNode.change],
+                wireframe: true,
+                transparent: true,
+                opacity: typedNode.change === 'changed' ? 0.58 : 0.4,
+                depthWrite: false,
+              }),
+            );
+            group.add(shell);
+          }
+
+          const showLabel = !faded && (selected || edgeEndpoint || alwaysLabelKinds.has(typedNode.kind));
+          if (showLabel) {
+            const sprite = new SpriteText(
+              typedNode.label,
+              selected ? 4.8 : edgeEndpoint ? 4.2 : typedNode.kind === 'product' ? 4.1 : 3.25,
+              selected ? '#ffffff' : '#dbe6f8',
+            );
+            sprite.backgroundColor = 'rgba(9, 13, 23, 0.80)';
+            sprite.padding = [3, 2];
+            sprite.borderRadius = 4;
+            sprite.fontFace = 'Inter, Arial, sans-serif';
+            sprite.fontWeight = selected || typedNode.kind === 'product' ? '700' : '500';
+            sprite.material.depthTest = false;
+            sprite.renderOrder = 1000;
+            sprite.position.y = radius + 5;
+            group.add(sprite);
+          }
+
           return group;
         }}
-        nodeThreeObjectExtend
         linkColor={(link) => {
           const typedLink = link as RenderLink;
           return isLinkFaded(typedLink) ? '#20283a' : typedLink.baseColor;
         }}
-        linkOpacity={0.48}
+        linkOpacity={0.55}
         linkWidth={(link) => {
           const typedLink = link as RenderLink;
           if (typedLink.id === selectedEdgeId) return 3.4;
-          if (isLinkFaded(typedLink)) return 0;
+          if (isLinkFaded(typedLink)) return 0.12;
           if (visualMode === 'drift') {
-            return typedLink.drift === 'stable' ? 0 : typedLink.drift === 'modified' ? 1.8 : 1.25;
+            return typedLink.drift === 'stable' ? 0.25 : typedLink.drift === 'modified' ? 1.8 : 1.25;
           }
           if (typedLink.health === 'error') return 2.4;
           if (typedLink.health === 'impacted') return 1.5;
           if (typedLink.health === 'warning') return 1.2;
           if (typedLink.change === 'affected') return 0.9;
           if (typedLink.change === 'changed') return 0.7;
-          return 0;
+          return 0.38;
         }}
         linkResolution={6}
         linkLabel={(link) => {
@@ -349,6 +480,16 @@ export function GraphCanvas({
         }}
         linkDirectionalArrowRelPos={0.82}
         linkDirectionalArrowColor={(link) => (link as RenderLink).baseColor}
+        linkDirectionalParticles={(link) => {
+          const typedLink = link as RenderLink;
+          if (isLinkFaded(typedLink)) return 0;
+          if (typedLink.id === selectedEdgeId) return 4;
+          if (typedLink.health === 'error') return 2;
+          return 0;
+        }}
+        linkDirectionalParticleWidth={(link) => (link as RenderLink).id === selectedEdgeId ? 2.4 : 1.5}
+        linkDirectionalParticleSpeed={0.004}
+        linkDirectionalParticleColor={(link) => (link as RenderLink).baseColor}
         onNodeClick={(node) => {
           const typedNode = node as RenderNode;
           onSelectEdge(undefined);
@@ -365,12 +506,12 @@ export function GraphCanvas({
         }}
         onEngineStop={() => {
           if (fittedGraphRef.current === graphIdentity) return;
-          fittedGraphRef.current = graphIdentity;
-          graphRef.current?.zoomToFit(450, 72);
+          fitGraph();
         }}
       />
-      <div className="graph-nav-hint" aria-hidden="true">
-        Drag to orbit · Scroll to zoom · Right-drag to pan
+      <div className="graph-controls">
+        <button type="button" onClick={fitGraph}>Fit graph</button>
+        <span aria-hidden="true">Drag to orbit · Scroll to zoom · Right-drag to pan</span>
       </div>
     </div>
   );
