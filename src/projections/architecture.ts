@@ -1,4 +1,10 @@
-import type { ArchEdge, ArchGraphData, ArchNode, HealthState } from '../types';
+import type {
+  ArchEdge,
+  ArchGraphData,
+  ArchNode,
+  ChangeState,
+  HealthState,
+} from '../types';
 
 const healthRank: Record<HealthState, number> = {
   healthy: 0,
@@ -8,9 +14,22 @@ const healthRank: Record<HealthState, number> = {
   error: 4,
 };
 
+const changeRank: Record<ChangeState, number> = {
+  unchanged: 0,
+  affected: 1,
+  changed: 2,
+};
+
 function worstHealth(...states: HealthState[]): HealthState {
   return states.reduce<HealthState>((current, next) =>
     healthRank[next] > healthRank[current] ? next : current, 'healthy');
+}
+
+function worstChange(...states: Array<ChangeState | undefined>): ChangeState {
+  return states.reduce<ChangeState>((current, next) => {
+    if (!next) return current;
+    return changeRank[next] > changeRank[current] ? next : current;
+  }, 'unchanged');
 }
 
 function titleCase(value: string) {
@@ -68,8 +87,10 @@ interface FeatureBucket {
   label: string;
   source: 'config' | 'detected';
   health: HealthState;
+  change: ChangeState;
   memberIds: Set<string>;
   counts: Record<'route' | 'api' | 'component' | 'service' | 'data' | 'file', number>;
+  changeCounts: Record<'changed' | 'affected', number>;
 }
 
 function makeBucket(key: string, label?: string, source: FeatureBucket['source'] = 'detected'): FeatureBucket {
@@ -79,8 +100,10 @@ function makeBucket(key: string, label?: string, source: FeatureBucket['source']
     label: label?.trim() || titleCase(key),
     source,
     health: 'healthy',
+    change: 'unchanged',
     memberIds: new Set(),
     counts: { route: 0, api: 0, component: 0, service: 0, data: 0, file: 0 },
+    changeCounts: { changed: 0, affected: 0 },
   };
 }
 
@@ -90,12 +113,14 @@ function addEdge(edges: ArchEdge[], dedupe: Map<string, ArchEdge>, edge: Omit<Ar
   if (existing) {
     const incomingIsAtLeastAsSevere = healthRank[edge.health] >= healthRank[existing.health];
     existing.health = worstHealth(existing.health, edge.health);
+    existing.change = worstChange(existing.change, edge.change);
     if (!existing.label && edge.label) existing.label = edge.label;
     if (incomingIsAtLeastAsSevere && edge.metadata) existing.metadata = { ...edge.metadata };
     return;
   }
   const created: ArchEdge = {
     ...edge,
+    change: edge.change ?? 'unchanged',
     metadata: edge.metadata ? { ...edge.metadata } : undefined,
     id: `projection:${edges.length + 1}`,
   };
@@ -135,6 +160,10 @@ function buildBuckets(data: ArchGraphData) {
 
     bucket.memberIds.add(node.id);
     bucket.health = worstHealth(bucket.health, node.health);
+    bucket.change = worstChange(bucket.change, node.change);
+    if (node.change === 'changed') bucket.changeCounts.changed += 1;
+    if (node.change === 'affected') bucket.changeCounts.affected += 1;
+
     if (node.kind in bucket.counts) {
       bucket.counts[node.kind as keyof FeatureBucket['counts']] += 1;
     } else {
@@ -150,11 +179,17 @@ function buildBuckets(data: ArchGraphData) {
     const targetFeature = membership.get(edge.target);
     if (sourceFeature) {
       const bucket = bucketById.get(sourceFeature);
-      if (bucket) bucket.health = worstHealth(bucket.health, edge.health);
+      if (bucket) {
+        bucket.health = worstHealth(bucket.health, edge.health);
+        bucket.change = worstChange(bucket.change, edge.change);
+      }
     }
     if (targetFeature) {
       const bucket = bucketById.get(targetFeature);
-      if (bucket) bucket.health = worstHealth(bucket.health, edge.health);
+      if (bucket) {
+        bucket.health = worstHealth(bucket.health, edge.health);
+        bucket.change = worstChange(bucket.change, edge.change);
+      }
     }
   }
 
@@ -167,6 +202,7 @@ function bucketNode(bucket: FeatureBucket): ArchNode {
     label: bucket.label,
     kind: 'feature',
     health: bucket.health,
+    change: bucket.change,
     metadata: {
       synthetic: true,
       semanticSource: bucket.source,
@@ -176,6 +212,8 @@ function bucketNode(bucket: FeatureBucket): ArchNode {
       components: bucket.counts.component,
       services: bucket.counts.service,
       data: bucket.counts.data,
+      changedMembers: bucket.changeCounts.changed,
+      affectedMembers: bucket.changeCounts.affected,
     },
   };
 }
@@ -191,13 +229,20 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
   const edges: ArchEdge[] = [];
   const dedupe = new Map<string, ArchEdge>();
   const projectId = `product:${data.project.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  const projectChange = worstChange(...[...buckets.values()].map((bucket) => bucket.change));
 
   nodes.push({
     id: projectId,
     label: data.project,
     kind: 'product',
     health: worstHealth(...[...buckets.values()].map((bucket) => bucket.health)),
-    metadata: { synthetic: true, featureCount: buckets.size },
+    change: projectChange,
+    metadata: {
+      synthetic: true,
+      featureCount: buckets.size,
+      changedFeatures: [...buckets.values()].filter((bucket) => bucket.change === 'changed').length,
+      affectedFeatures: [...buckets.values()].filter((bucket) => bucket.change === 'affected').length,
+    },
   });
 
   for (const bucket of buckets.values()) {
@@ -207,6 +252,7 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
       target: bucket.id,
       relation: 'contains',
       health: bucket.health,
+      change: bucket.change,
     });
   }
 
@@ -225,6 +271,7 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
         target: targetIntegration.id,
         relation: 'integrates-with',
         health: edge.health,
+        change: edge.change,
         label: edge.label,
         metadata: edge.metadata,
       });
@@ -238,6 +285,7 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
         target: targetFeature,
         relation: 'integrates-with',
         health: edge.health,
+        change: edge.change,
         label: edge.label,
         metadata: edge.metadata,
       });
@@ -250,6 +298,7 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
         target: targetFeature,
         relation: 'depends-on',
         health: edge.health,
+        change: edge.change,
         label: edge.label,
         metadata: edge.metadata,
       });
@@ -296,14 +345,17 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
         target: focusedFeatureId,
         relation: 'contains',
         health: focused.health,
+        change: focused.change,
       });
 
       for (const memberId of memberIds) {
+        const member = data.nodes.find((node) => node.id === memberId);
         addEdge(detailEdges, detailDedupe, {
           source: focusedFeatureId,
           target: memberId,
           relation: 'contains',
-          health: data.nodes.find((node) => node.id === memberId)?.health ?? 'unknown',
+          health: member?.health ?? 'unknown',
+          change: member?.change ?? 'unchanged',
         });
       }
 
@@ -322,6 +374,7 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
           target,
           relation: edge.relation,
           health: edge.health,
+          change: edge.change,
           label: edge.label,
           metadata: edge.metadata,
         });
