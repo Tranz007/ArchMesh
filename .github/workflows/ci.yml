@@ -47,5 +47,8 @@ jobs:
       - name: Package dry run
         run: npm run pack:check
 
+      - name: Packed install smoke test
+        run: npm run smoke:package
+
       - name: Self scan
         run: npm run scan -- .
