@@ -132,7 +132,7 @@ export function GraphCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
   const [size, setSize] = useState({ width: 1, height: 1 });
-  const fittedGraphRef = useRef<string>();
+  const fittedGraphRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     const container = containerRef.current;
