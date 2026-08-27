@@ -10,12 +10,11 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "scan": "tsx src/scanner/cli.ts",
-    "atlas": "npm run scan -- && vite",
+    "atlas": "tsx src/cli.ts",
     "test": "vitest run",
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
-    "@sigma/node-border": "^3.0.0",
     "graphology": "^0.26.0",
     "graphology-layout-forceatlas2": "^0.10.1",
     "lucide-react": "^0.468.0",
