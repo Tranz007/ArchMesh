@@ -40,7 +40,10 @@
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-force-graph-3d": "^1.29.1",
     "sigma": "^3.0.0",
+    "three": "^0.185.1",
+    "three-spritetext": "^1.10.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.5"
   },
@@ -48,6 +51,7 @@
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.3",
     "@types/react-dom": "^19.0.2",
+    "@types/three": "^0.185.4",
     "tsx": "^4.19.2",
     "vitest": "^2.1.8"
   },

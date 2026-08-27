@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
-import Graph from 'graphology';
-import forceAtlas2 from 'graphology-layout-forceatlas2';
-import Sigma from 'sigma';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import ForceGraph3D, { type ForceGraphMethods } from 'react-force-graph-3d';
+import { Group } from 'three';
+import SpriteText from 'three-spritetext';
 import type {
   ArchGraphData,
   ChangeState,
@@ -30,19 +30,55 @@ const driftColor: Record<DriftState, string> = {
   modified: '#fbbf24',
 };
 
-const kindSize: Record<string, number> = {
-  product: 18,
-  feature: 13,
-  integration: 12,
-  api: 10,
-  service: 10,
-  route: 9,
-  component: 8,
-  data: 9,
-  file: 6,
-  module: 6,
-  unknown: 7,
+const kindValue: Record<string, number> = {
+  product: 20,
+  feature: 10,
+  integration: 8,
+  api: 6,
+  service: 6,
+  route: 4,
+  component: 3.5,
+  data: 7,
+  file: 2,
+  module: 2,
+  unknown: 3,
 };
+
+const alwaysLabelKinds = new Set([
+  'product',
+  'feature',
+  'integration',
+  'api',
+  'service',
+  'data',
+]);
+
+interface RenderNode {
+  id: string;
+  label: string;
+  kind: string;
+  health: HealthState;
+  change: ChangeState;
+  drift: DriftState;
+  path?: string;
+  value: number;
+  baseColor: string;
+  x: number;
+  y: number;
+  z: number;
+}
+
+interface RenderLink {
+  id: string;
+  source: string | RenderNode;
+  target: string | RenderNode;
+  label: string;
+  relation: string;
+  health: HealthState;
+  change: ChangeState;
+  drift: DriftState;
+  baseColor: string;
+}
 
 function stableCoordinate(id: string, salt: number) {
   let hash = 2166136261 ^ salt;
@@ -51,6 +87,10 @@ function stableCoordinate(id: string, salt: number) {
     hash = Math.imul(hash, 16777619);
   }
   return ((hash >>> 0) % 10000) / 10000;
+}
+
+function seededAxis(id: string, salt: number) {
+  return (stableCoordinate(id, salt) - 0.5) * 140;
 }
 
 function graphColor(
@@ -64,6 +104,10 @@ function graphColor(
   if (health === 'error' || health === 'warning' || health === 'impacted') return healthColor[health];
   if (change === 'changed' || change === 'affected') return changeColor[change];
   return healthyDefault;
+}
+
+function endpointId(endpoint: string | RenderNode) {
+  return typeof endpoint === 'string' ? endpoint : endpoint.id;
 }
 
 interface GraphCanvasProps {
@@ -86,11 +130,29 @@ export function GraphCanvas({
   onSelectEdge,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
+  const [size, setSize] = useState({ width: 1, height: 1 });
+  const fittedGraphRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    const graph = new Graph({ multi: true, type: 'directed' });
+    const updateSize = () => {
+      const rect = container.getBoundingClientRect();
+      setSize({
+        width: Math.max(1, Math.floor(rect.width)),
+        height: Math.max(1, Math.floor(rect.height)),
+      });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  const graphData = useMemo(() => {
     const visibleNodes = new Set<string>();
 
     if (errorsOnly) {
@@ -107,133 +169,209 @@ export function GraphCanvas({
       }
     }
 
-    for (const node of data.nodes) {
-      if (errorsOnly && !visibleNodes.has(node.id)) continue;
-      const drift = node.drift ?? 'stable';
-      const driftScale = visualMode === 'drift'
-        ? drift === 'added'
-          ? 1.15
-          : drift === 'removed'
-            ? 0.95
-            : drift === 'modified'
-              ? 1.08
-              : 1
-        : 1;
-      graph.addNode(node.id, {
-        label: node.label,
-        kind: node.kind,
-        health: node.health,
-        change: node.change ?? 'unchanged',
-        drift,
-        path: node.path,
-        x: stableCoordinate(node.id, 17),
-        y: stableCoordinate(node.id, 71),
-        size: (kindSize[node.kind] ?? 7) * (node.change === 'changed' ? 1.12 : 1) * driftScale,
-        color: graphColor(node.health, node.change, node.drift, healthColor[node.health], visualMode),
-      });
-    }
+    const nodes: RenderNode[] = data.nodes
+      .filter((node) => !errorsOnly || visibleNodes.has(node.id))
+      .map((node) => {
+        const drift = node.drift ?? 'stable';
+        const driftScale = visualMode === 'drift'
+          ? drift === 'added'
+            ? 1.18
+            : drift === 'removed'
+              ? 0.94
+              : drift === 'modified'
+                ? 1.1
+                : 1
+          : 1;
 
-    for (const edge of data.edges) {
-      if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) continue;
-      if (errorsOnly && edge.health === 'healthy') continue;
-      const drift = edge.drift ?? 'stable';
-      const driftSize = visualMode === 'drift'
-        ? drift === 'stable' ? 0.7 : drift === 'modified' ? 2.4 : 2
-        : 1;
-      graph.addEdgeWithKey(edge.id, edge.source, edge.target, {
+        return {
+          id: node.id,
+          label: node.label,
+          kind: node.kind,
+          health: node.health,
+          change: node.change ?? 'unchanged',
+          drift,
+          path: node.path,
+          value: (kindValue[node.kind] ?? 3) * (node.change === 'changed' ? 1.12 : 1) * driftScale,
+          baseColor: graphColor(node.health, node.change, node.drift, healthColor[node.health], visualMode),
+          x: seededAxis(node.id, 17),
+          y: seededAxis(node.id, 71),
+          z: seededAxis(node.id, 137),
+        };
+      });
+
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const links: RenderLink[] = data.edges
+      .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
+      .filter((edge) => !errorsOnly || edge.health !== 'healthy')
+      .map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
         label: edge.label ?? edge.relation,
         relation: edge.relation,
         health: edge.health,
         change: edge.change ?? 'unchanged',
-        drift,
-        size: visualMode === 'drift'
-          ? driftSize
-          : edge.health === 'error'
-            ? 3
-            : edge.health === 'impacted'
-              ? 2
-              : edge.change === 'affected'
-                ? 1.8
-                : 1,
-        color: graphColor(edge.health, edge.change, edge.drift, '#38445b', visualMode),
-      });
-    }
+        drift: edge.drift ?? 'stable',
+        baseColor: graphColor(edge.health, edge.change, edge.drift, '#38445b', visualMode),
+      }));
 
-    if (graph.order > 1) {
-      const settings = forceAtlas2.inferSettings(graph);
-      forceAtlas2.assign(graph, {
-        iterations: Math.min(180, Math.max(50, graph.order * 5)),
-        settings: {
-          ...settings,
-          gravity: 1.5,
-          scalingRatio: 8,
-          slowDown: 3,
-        },
-      });
-    }
+    return { nodes, links };
+  }, [data, errorsOnly, visualMode]);
 
-    const activeNodeSelection = selectedNodeId && graph.hasNode(selectedNodeId) ? selectedNodeId : undefined;
-    const activeEdgeSelection = selectedEdgeId && graph.hasEdge(selectedEdgeId) ? selectedEdgeId : undefined;
-    const edgeEndpoints = activeEdgeSelection
-      ? new Set([graph.source(activeEdgeSelection), graph.target(activeEdgeSelection)])
+  const selection = useMemo(() => {
+    const selectedEdge = selectedEdgeId
+      ? data.edges.find((edge) => edge.id === selectedEdgeId)
       : undefined;
+    const edgeEndpoints = selectedEdge
+      ? new Set([selectedEdge.source, selectedEdge.target])
+      : undefined;
+    const neighbors = new Set<string>();
 
-    const renderer = new Sigma(graph, containerRef.current, {
-      renderEdgeLabels: false,
-      labelRenderedSizeThreshold: 7,
-      labelColor: { color: '#dbe6f8' },
-      labelWeight: '500',
-      minCameraRatio: 0.08,
-      maxCameraRatio: 8,
-      nodeReducer(node, attributes) {
-        if (activeEdgeSelection && edgeEndpoints) {
-          if (edgeEndpoints.has(node)) {
-            return { ...attributes, highlighted: true, size: Number(attributes.size) * 1.25 };
+    if (selectedNodeId) {
+      for (const edge of data.edges) {
+        if (edge.source === selectedNodeId) neighbors.add(edge.target);
+        if (edge.target === selectedNodeId) neighbors.add(edge.source);
+      }
+    }
+
+    return { edgeEndpoints, neighbors };
+  }, [data.edges, selectedEdgeId, selectedNodeId]);
+
+  const isNodeFaded = (node: RenderNode) => {
+    if (selection.edgeEndpoints) return !selection.edgeEndpoints.has(node.id);
+    if (!selectedNodeId) return false;
+    return node.id !== selectedNodeId && !selection.neighbors.has(node.id);
+  };
+
+  const isLinkFaded = (link: RenderLink) => {
+    if (selectedEdgeId) return link.id !== selectedEdgeId;
+    if (!selectedNodeId) return false;
+    return endpointId(link.source) !== selectedNodeId && endpointId(link.target) !== selectedNodeId;
+  };
+
+  const graphIdentity = useMemo(
+    () => `${visualMode}:${errorsOnly ? 'errors' : 'all'}:${graphData.nodes.map((node) => node.id).join('|')}`,
+    [errorsOnly, graphData.nodes, visualMode],
+  );
+
+  return (
+    <div ref={containerRef} className="graph-canvas graph-canvas-3d" aria-label="Interactive 3D architecture graph">
+      <ForceGraph3D
+        ref={graphRef}
+        graphData={graphData}
+        width={size.width}
+        height={size.height}
+        backgroundColor="#090d17"
+        controlType="orbit"
+        enableNavigationControls
+        enableNodeDrag={false}
+        showNavInfo={false}
+        numDimensions={3}
+        forceEngine="d3"
+        warmupTicks={60}
+        cooldownTicks={150}
+        cooldownTime={4500}
+        d3VelocityDecay={0.34}
+        nodeRelSize={1.55}
+        nodeVal={(node) => {
+          const typedNode = node as RenderNode;
+          const selected = typedNode.id === selectedNodeId;
+          const edgeEndpoint = selection.edgeEndpoints?.has(typedNode.id) ?? false;
+          return typedNode.value * (selected ? 1.8 : edgeEndpoint ? 1.45 : 1);
+        }}
+        nodeColor={(node) => {
+          const typedNode = node as RenderNode;
+          return isNodeFaded(typedNode) ? '#273147' : typedNode.baseColor;
+        }}
+        nodeOpacity={0.94}
+        nodeResolution={14}
+        nodeLabel={(node) => {
+          const typedNode = node as RenderNode;
+          return `${typedNode.label} · ${typedNode.kind}`;
+        }}
+        nodeThreeObject={(node) => {
+          const typedNode = node as RenderNode;
+          const group = new Group();
+          const faded = isNodeFaded(typedNode);
+          const selected = typedNode.id === selectedNodeId;
+          const edgeEndpoint = selection.edgeEndpoints?.has(typedNode.id) ?? false;
+          const showLabel = !faded && (selected || edgeEndpoint || alwaysLabelKinds.has(typedNode.kind));
+          if (!showLabel) return group;
+
+          const sprite = new SpriteText(
+            typedNode.label,
+            selected ? 4.8 : edgeEndpoint ? 4.2 : 3.3,
+            selected ? '#ffffff' : '#dbe6f8',
+          );
+          sprite.backgroundColor = 'rgba(9, 13, 23, 0.78)';
+          sprite.padding = [3, 2];
+          sprite.borderRadius = 4;
+          sprite.fontFace = 'Inter, Arial, sans-serif';
+          sprite.fontWeight = selected ? '700' : '500';
+          sprite.material.depthTest = false;
+          sprite.renderOrder = 1000;
+          sprite.position.y = 5 + Math.cbrt(typedNode.value) * 1.6;
+          group.add(sprite);
+          return group;
+        }}
+        nodeThreeObjectExtend
+        linkColor={(link) => {
+          const typedLink = link as RenderLink;
+          return isLinkFaded(typedLink) ? '#20283a' : typedLink.baseColor;
+        }}
+        linkOpacity={0.48}
+        linkWidth={(link) => {
+          const typedLink = link as RenderLink;
+          if (typedLink.id === selectedEdgeId) return 3.4;
+          if (isLinkFaded(typedLink)) return 0;
+          if (visualMode === 'drift') {
+            return typedLink.drift === 'stable' ? 0 : typedLink.drift === 'modified' ? 1.8 : 1.25;
           }
-          return { ...attributes, color: '#283146', label: '', zIndex: 0 };
-        }
-
-        if (!activeNodeSelection) return attributes;
-        if (node === activeNodeSelection) {
-          return { ...attributes, highlighted: true, size: Number(attributes.size) * 1.3 };
-        }
-        const neighbors = new Set(graph.neighbors(activeNodeSelection));
-        if (neighbors.has(node)) return attributes;
-        return { ...attributes, color: '#283146', label: '', zIndex: 0 };
-      },
-      edgeReducer(edge, attributes) {
-        if (activeEdgeSelection) {
-          if (edge === activeEdgeSelection) {
-            return { ...attributes, size: Math.max(Number(attributes.size), 4), zIndex: 10 };
-          }
-          return { ...attributes, color: '#222a3a', hidden: false, size: 0.4, zIndex: 0 };
-        }
-
-        if (!activeNodeSelection) return attributes;
-        const source = graph.source(edge);
-        const target = graph.target(edge);
-        if (source === activeNodeSelection || target === activeNodeSelection) {
-          return { ...attributes, size: Math.max(Number(attributes.size), 2) };
-        }
-        return { ...attributes, color: '#222a3a', hidden: false, size: 0.5 };
-      },
-    });
-
-    renderer.on('clickNode', ({ node }) => {
-      onSelectEdge(undefined);
-      onSelectNode(node);
-    });
-    renderer.on('clickEdge', ({ edge }) => {
-      onSelectNode(undefined);
-      onSelectEdge(edge);
-    });
-    renderer.on('clickStage', () => {
-      onSelectNode(undefined);
-      onSelectEdge(undefined);
-    });
-
-    return () => renderer.kill();
-  }, [data, errorsOnly, visualMode, selectedNodeId, selectedEdgeId, onSelectNode, onSelectEdge]);
-
-  return <div ref={containerRef} className="graph-canvas" aria-label="Interactive architecture graph" />;
+          if (typedLink.health === 'error') return 2.4;
+          if (typedLink.health === 'impacted') return 1.5;
+          if (typedLink.health === 'warning') return 1.2;
+          if (typedLink.change === 'affected') return 0.9;
+          if (typedLink.change === 'changed') return 0.7;
+          return 0;
+        }}
+        linkResolution={6}
+        linkLabel={(link) => {
+          const typedLink = link as RenderLink;
+          return `${typedLink.label} · ${typedLink.health}`;
+        }}
+        linkHoverPrecision={5}
+        linkDirectionalArrowLength={(link) => {
+          const typedLink = link as RenderLink;
+          if (isLinkFaded(typedLink)) return 0;
+          if (typedLink.id === selectedEdgeId) return 4;
+          if (typedLink.health === 'error' || typedLink.health === 'impacted') return 2.3;
+          return 0;
+        }}
+        linkDirectionalArrowRelPos={0.82}
+        linkDirectionalArrowColor={(link) => (link as RenderLink).baseColor}
+        onNodeClick={(node) => {
+          const typedNode = node as RenderNode;
+          onSelectEdge(undefined);
+          onSelectNode(typedNode.id);
+        }}
+        onLinkClick={(link) => {
+          const typedLink = link as RenderLink;
+          onSelectNode(undefined);
+          onSelectEdge(typedLink.id);
+        }}
+        onBackgroundClick={() => {
+          onSelectNode(undefined);
+          onSelectEdge(undefined);
+        }}
+        onEngineStop={() => {
+          if (fittedGraphRef.current === graphIdentity) return;
+          fittedGraphRef.current = graphIdentity;
+          graphRef.current?.zoomToFit(450, 72);
+        }}
+      />
+      <div className="graph-nav-hint" aria-hidden="true">
+        Drag to orbit · Scroll to zoom · Right-drag to pan
+      </div>
+    </div>
+  );
 }
