@@ -118,23 +118,30 @@ export default function App() {
   const [errorsOnly, setErrorsOnly] = useState(false);
   const [query, setQuery] = useState('');
 
-  useEffect(() => {
-    fetch('/archmesh.json', { cache: 'no-store' })
-      .then((response) => {
-        if (!response.ok) throw new Error('No scan available');
-        return response.json() as Promise<ArchGraphData>;
-      })
-      .then((graph) => {
-        if (Array.isArray(graph.nodes) && Array.isArray(graph.edges)) {
-          setData(graph);
-          setSource('scan');
-        }
-      })
-      .catch(() => {
-        setData(sampleGraph);
-        setSource('demo');
-      });
+  const loadGraph = useCallback(async () => {
+    try {
+      const response = await fetch(`/archmesh.json?t=${Date.now()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('No scan available');
+      const graph = await response.json() as ArchGraphData;
+      if (!Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) throw new Error('Invalid graph data');
+      setData(graph);
+      setSource('scan');
+    } catch {
+      setData(sampleGraph);
+      setSource('demo');
+    }
   }, []);
+
+  useEffect(() => {
+    void loadGraph();
+
+    const onGraphRefresh = () => void loadGraph();
+    import.meta.hot?.on('archmesh:graph', onGraphRefresh);
+
+    return () => {
+      import.meta.hot?.off('archmesh:graph', onGraphRefresh);
+    };
+  }, [loadGraph]);
 
   const architectureProjection = useMemo(
     () => projectArchitecture(data, focusedFeatureId),
@@ -165,6 +172,15 @@ export default function App() {
     setSelectedNodeId(undefined);
     setSelectedEdgeId(undefined);
   }, []);
+
+  useEffect(() => {
+    if (selectedNodeId && !visibleData.nodes.some((node) => node.id === selectedNodeId)) {
+      setSelectedNodeId(undefined);
+    }
+    if (selectedEdgeId && !visibleData.edges.some((edge) => edge.id === selectedEdgeId)) {
+      setSelectedEdgeId(undefined);
+    }
+  }, [selectedEdgeId, selectedNodeId, visibleData.edges, visibleData.nodes]);
 
   const selectedNode = useMemo(
     () => visibleData.nodes.find((node) => node.id === selectedNodeId),
