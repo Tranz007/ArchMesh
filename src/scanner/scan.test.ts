@@ -96,6 +96,71 @@ describe('scanProject', () => {
     });
   });
 
+  it('maps static internal fetch calls to API routes', async () => {
+    const root = await fixture({
+      'src/app/story/page.tsx': `export async function publish(){ return fetch('/api/story/publish', { method: 'POST' }) }`,
+      'src/app/api/story/publish/route.ts': `export async function POST(){ return new Response('ok') }`,
+    });
+
+    const graph = await scanProject(root);
+    const page = graph.nodes.find((node) => node.path === 'src/app/story/page.tsx');
+    const api = graph.nodes.find((node) => node.path === 'src/app/api/story/publish/route.ts');
+
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: page?.id,
+          target: api?.id,
+          relation: 'calls',
+          label: 'POST /api/story/publish',
+        }),
+      ]),
+    );
+  });
+
+  it('maps external fetch calls to HTTP integration nodes', async () => {
+    const root = await fixture({
+      'src/services/status.ts': `export async function status(){ return fetch('https://api.example.com/v1/status') }`,
+    });
+
+    const graph = await scanProject(root);
+    const service = graph.nodes.find((node) => node.path === 'src/services/status.ts');
+    const integration = graph.nodes.find((node) => node.id === 'integration:http:api.example.com');
+
+    expect(integration?.metadata).toMatchObject({ provider: 'HTTP', host: 'api.example.com' });
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: service?.id, target: integration?.id, relation: 'calls' }),
+      ]),
+    );
+  });
+
+  it('maps Firestore reads and writes to collection nodes', async () => {
+    const root = await fixture({
+      'src/services/story.ts': `
+        import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
+        export async function list(db){ return getDocs(collection(db, 'stories')) }
+        export async function save(db, id, value){ return setDoc(doc(db, 'stories', id), value) }
+      `,
+    });
+
+    const graph = await scanProject(root);
+    const service = graph.nodes.find((node) => node.path === 'src/services/story.ts');
+    const stories = graph.nodes.find((node) => node.id === 'data:firestore:stories');
+
+    expect(stories?.metadata).toMatchObject({
+      provider: 'Firebase',
+      resourceType: 'Firestore collection',
+      collection: 'stories',
+    });
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: service?.id, target: stories?.id, relation: 'reads' }),
+        expect.objectContaining({ source: service?.id, target: stories?.id, relation: 'writes' }),
+      ]),
+    );
+  });
+
   it('marks configured product semantics on scanned nodes', async () => {
     const root = await fixture({
       'archmesh.config.json': JSON.stringify({
