@@ -59,6 +59,8 @@ button { color: inherit; }
 }
 .status-error { color: #ff8792; border-color: rgba(255, 77, 94, 0.28); background: rgba(255, 77, 94, 0.08); }
 .status-impact { color: #ffad94; border-color: rgba(255, 143, 112, 0.26); background: rgba(255, 143, 112, 0.07); }
+.status-changed { color: #8cc8ff; border-color: rgba(88, 166, 255, .28); background: rgba(88, 166, 255, .08); }
+.status-affected { color: #c6b5ff; border-color: rgba(167, 139, 250, .28); background: rgba(167, 139, 250, .08); }
 
 .toolbar {
   min-height: 58px;
@@ -226,6 +228,8 @@ button { color: inherit; }
 .legend-dot.warning { background: #f0b44d; }
 .legend-dot.error { background: #ff4d5e; }
 .legend-dot.impacted { background: #ff8f70; }
+.legend-dot.changed { background: #58a6ff; }
+.legend-dot.affected { background: #a78bfa; }
 
 .inspector {
   padding: 20px;
@@ -306,6 +310,8 @@ button { color: inherit; }
 .connection-copy strong { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .connection-copy small { color: #738099; font-size: 10px; }
 .edge-state { width: 7px; height: 26px; border-radius: 6px; background: #536077; flex: 0 0 auto; }
+.edge-state.change-changed { background: #58a6ff; }
+.edge-state.change-affected { background: #a78bfa; }
 .edge-state.error { background: #ff4d5e; }
 .edge-state.warning { background: #f0b44d; }
 .edge-state.impacted { background: #ff8f70; }
@@ -332,7 +338,7 @@ button { color: inherit; }
   .topbar { align-items: flex-start; flex-direction: column; }
   .status-strip { justify-content: flex-start; }
   .toolbar-actions { align-items: flex-start; flex-direction: column; }
-  .view-switch { width: 100%; }
-  .view-switch button { flex: 1; justify-content: center; }
+  .view-switch { width: 100%; flex-wrap: wrap; }
+  .view-switch button { flex: 1; justify-content: center; min-width: 110px; }
   .focus-bar { align-items: flex-start; flex-direction: column; }
 }
