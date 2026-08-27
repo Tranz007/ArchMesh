@@ -1,5 +1,6 @@
 export type HealthState = 'healthy' | 'warning' | 'error' | 'impacted' | 'unknown';
 export type ChangeState = 'unchanged' | 'changed' | 'affected';
+export type DriftState = 'stable' | 'added' | 'removed' | 'modified';
 
 export type NodeKind =
   | 'product'
@@ -23,6 +24,7 @@ export interface ArchNode {
   path?: string;
   health: HealthState;
   change?: ChangeState;
+  drift?: DriftState;
   metadata?: GraphMetadata;
 }
 
@@ -33,6 +35,7 @@ export interface ArchEdge {
   relation: 'contains' | 'imports' | 'calls' | 'reads' | 'writes' | 'depends-on' | 'integrates-with';
   health: HealthState;
   change?: ChangeState;
+  drift?: DriftState;
   label?: string;
   metadata?: GraphMetadata;
 }
@@ -42,4 +45,5 @@ export interface ArchGraphData {
   generatedAt: string;
   nodes: ArchNode[];
   edges: ArchEdge[];
+  metadata?: GraphMetadata;
 }
