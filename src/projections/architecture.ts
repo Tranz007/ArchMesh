@@ -106,13 +106,17 @@ function configuredFeature(node: ArchNode) {
   };
 }
 
+function isExternalResource(node: ArchNode) {
+  return node.kind === 'integration' || (node.kind === 'data' && !node.path);
+}
+
 function buildBuckets(data: ArchGraphData) {
   const buckets = new Map<string, FeatureBucket>();
   const membership = new Map<string, string>();
   const bucketById = new Map<string, FeatureBucket>();
 
   for (const node of data.nodes) {
-    if (node.kind === 'integration' || node.kind === 'product' || node.kind === 'feature') continue;
+    if (node.kind === 'product' || node.kind === 'feature' || isExternalResource(node)) continue;
     const configured = configuredFeature(node);
     const key = configured?.key ?? featureKeyForPath(node.path) ?? 'core';
     const source: FeatureBucket['source'] = configured ? 'config' : 'detected';
@@ -248,12 +252,14 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
       const relevantOriginalEdges = data.edges.filter(
         (edge) => memberIds.has(edge.source) || memberIds.has(edge.target),
       );
-      const integrationIds = new Set<string>();
+      const externalResourceIds = new Set<string>();
       const neighborFeatureIds = new Set<string>();
 
       for (const edge of relevantOriginalEdges) {
-        if (integrations.has(edge.source)) integrationIds.add(edge.source);
-        if (integrations.has(edge.target)) integrationIds.add(edge.target);
+        const sourceNode = data.nodes.find((node) => node.id === edge.source);
+        const targetNode = data.nodes.find((node) => node.id === edge.target);
+        if (sourceNode && isExternalResource(sourceNode)) externalResourceIds.add(sourceNode.id);
+        if (targetNode && isExternalResource(targetNode)) externalResourceIds.add(targetNode.id);
         const sourceFeature = membership.get(edge.source);
         const targetFeature = membership.get(edge.target);
         if (sourceFeature && sourceFeature !== focusedFeatureId) neighborFeatureIds.add(sourceFeature);
@@ -264,7 +270,7 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
         nodes.find((node) => node.id === projectId)!,
         bucketNode(focused),
         ...data.nodes.filter((node) => memberIds.has(node.id)),
-        ...data.nodes.filter((node) => integrationIds.has(node.id)),
+        ...data.nodes.filter((node) => externalResourceIds.has(node.id)),
         ...[...neighborFeatureIds]
           .map((id) => bucketById.get(id))
           .filter((bucket): bucket is FeatureBucket => Boolean(bucket))
