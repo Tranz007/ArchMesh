@@ -66,16 +66,18 @@ interface FeatureBucket {
   key: string;
   id: string;
   label: string;
+  source: 'config' | 'detected';
   health: HealthState;
   memberIds: Set<string>;
   counts: Record<'route' | 'api' | 'component' | 'service' | 'data' | 'file', number>;
 }
 
-function makeBucket(key: string): FeatureBucket {
+function makeBucket(key: string, label?: string, source: FeatureBucket['source'] = 'detected'): FeatureBucket {
   return {
     key,
     id: featureId(key),
-    label: titleCase(key),
+    label: label?.trim() || titleCase(key),
+    source,
     health: 'healthy',
     memberIds: new Set(),
     counts: { route: 0, api: 0, component: 0, service: 0, data: 0, file: 0 },
@@ -94,14 +96,32 @@ function addEdge(edges: ArchEdge[], dedupe: Map<string, ArchEdge>, edge: Omit<Ar
   dedupe.set(key, created);
 }
 
+function configuredFeature(node: ArchNode) {
+  const key = node.metadata?.featureKey;
+  if (typeof key !== 'string' || key.trim().length === 0) return undefined;
+  const label = node.metadata?.featureLabel;
+  return {
+    key,
+    label: typeof label === 'string' && label.trim().length > 0 ? label : undefined,
+  };
+}
+
 function buildBuckets(data: ArchGraphData) {
   const buckets = new Map<string, FeatureBucket>();
   const membership = new Map<string, string>();
+  const bucketById = new Map<string, FeatureBucket>();
 
   for (const node of data.nodes) {
     if (node.kind === 'integration' || node.kind === 'product' || node.kind === 'feature') continue;
-    const key = featureKeyForPath(node.path) ?? 'core';
-    const bucket = buckets.get(key) ?? makeBucket(key);
+    const configured = configuredFeature(node);
+    const key = configured?.key ?? featureKeyForPath(node.path) ?? 'core';
+    const source: FeatureBucket['source'] = configured ? 'config' : 'detected';
+    const existing = buckets.get(key);
+    const bucket = existing ?? makeBucket(key, configured?.label, source);
+
+    if (configured?.label && existing?.source !== 'config') bucket.label = configured.label;
+    if (configured) bucket.source = 'config';
+
     bucket.memberIds.add(node.id);
     bucket.health = worstHealth(bucket.health, node.health);
     if (node.kind in bucket.counts) {
@@ -110,6 +130,7 @@ function buildBuckets(data: ArchGraphData) {
       bucket.counts.file += 1;
     }
     buckets.set(key, bucket);
+    bucketById.set(bucket.id, bucket);
     membership.set(node.id, bucket.id);
   }
 
@@ -117,16 +138,16 @@ function buildBuckets(data: ArchGraphData) {
     const sourceFeature = membership.get(edge.source);
     const targetFeature = membership.get(edge.target);
     if (sourceFeature) {
-      const bucket = [...buckets.values()].find((candidate) => candidate.id === sourceFeature);
+      const bucket = bucketById.get(sourceFeature);
       if (bucket) bucket.health = worstHealth(bucket.health, edge.health);
     }
     if (targetFeature) {
-      const bucket = [...buckets.values()].find((candidate) => candidate.id === targetFeature);
+      const bucket = bucketById.get(targetFeature);
       if (bucket) bucket.health = worstHealth(bucket.health, edge.health);
     }
   }
 
-  return { buckets, membership };
+  return { buckets, membership, bucketById };
 }
 
 function bucketNode(bucket: FeatureBucket): ArchNode {
@@ -137,6 +158,7 @@ function bucketNode(bucket: FeatureBucket): ArchNode {
     health: bucket.health,
     metadata: {
       synthetic: true,
+      semanticSource: bucket.source,
       memberCount: bucket.memberIds.size,
       routes: bucket.counts.route,
       apis: bucket.counts.api,
@@ -153,7 +175,7 @@ export interface ArchitectureProjection {
 }
 
 export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: string): ArchitectureProjection {
-  const { buckets, membership } = buildBuckets(data);
+  const { buckets, membership, bucketById } = buildBuckets(data);
   const nodes: ArchNode[] = [];
   const edges: ArchEdge[] = [];
   const dedupe = new Map<string, ArchEdge>();
@@ -220,7 +242,7 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
   }
 
   if (focusedFeatureId && buckets.size > 0) {
-    const focused = [...buckets.values()].find((bucket) => bucket.id === focusedFeatureId);
+    const focused = bucketById.get(focusedFeatureId);
     if (focused) {
       const memberIds = focused.memberIds;
       const relevantOriginalEdges = data.edges.filter(
@@ -244,7 +266,7 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
         ...data.nodes.filter((node) => memberIds.has(node.id)),
         ...data.nodes.filter((node) => integrationIds.has(node.id)),
         ...[...neighborFeatureIds]
-          .map((id) => [...buckets.values()].find((bucket) => bucket.id === id))
+          .map((id) => bucketById.get(id))
           .filter((bucket): bucket is FeatureBucket => Boolean(bucket))
           .map(bucketNode),
       ];
