@@ -49,7 +49,8 @@ function appRoutePath(relativePath: string, kind: NodeKind) {
 }
 
 function isExported(node: ts.Node) {
-  return Boolean(ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
+  return ts.canHaveModifiers(node)
+    && Boolean(ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
 }
 
 function exportedHttpMethods(sourceFile: ts.SourceFile) {
@@ -79,13 +80,25 @@ function hasDirective(statements: ts.NodeArray<ts.Statement>, directive: string)
   );
 }
 
+function functionBlock(node: ts.Node): ts.Block | undefined {
+  if (ts.isFunctionDeclaration(node)
+    || ts.isFunctionExpression(node)
+    || ts.isArrowFunction(node)
+    || ts.isMethodDeclaration(node)
+    || ts.isGetAccessorDeclaration(node)
+    || ts.isSetAccessorDeclaration(node)
+    || ts.isConstructorDeclaration(node)) {
+    return node.body && ts.isBlock(node.body) ? node.body : undefined;
+  }
+  return undefined;
+}
+
 function serverActionCount(sourceFile: ts.SourceFile) {
   let count = hasDirective(sourceFile.statements, 'use server') ? 1 : 0;
 
   const visit = (node: ts.Node) => {
-    if (ts.isFunctionLike(node) && node.body && ts.isBlock(node.body)) {
-      if (hasDirective(node.body.statements, 'use server')) count += 1;
-    }
+    const body = functionBlock(node);
+    if (body && hasDirective(body.statements, 'use server')) count += 1;
     ts.forEachChild(node, visit);
   };
 
