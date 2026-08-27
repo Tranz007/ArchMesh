@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { buildGraph, type BuildGraphResult } from './build-graph.js';
 import { parseCliOptions } from './cli-options.js';
+import { compareGraphs } from './drift/compare.js';
+import { createEmptyDriftGraph } from './drift/empty.js';
 import { writeGraphOutput } from './output.js';
 import { watchProject } from './watch.js';
 
@@ -10,6 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const archMeshRoot = path.resolve(here, '..');
 const options = parseCliOptions(process.argv.slice(2));
 const output = path.join(archMeshRoot, 'public', 'archmesh.json');
+const driftOutput = path.join(archMeshRoot, 'public', 'archmesh-drift.json');
 
 function logResult(result: BuildGraphResult, prefix = 'Mapped') {
   const { graph, changedPaths, signals } = result;
@@ -28,7 +31,9 @@ function logResult(result: BuildGraphResult, prefix = 'Mapped') {
 
 console.log(`\nArchMesh → ${options.target}`);
 const initial = await buildGraph(options);
+let previousGraph = initial.graph;
 await writeGraphOutput(output, initial.graph);
+await writeGraphOutput(driftOutput, createEmptyDriftGraph(initial.graph));
 logResult(initial);
 
 const server = await createServer({
@@ -47,8 +52,24 @@ if (options.watch) {
   console.log('Watching project source for architecture changes.');
   watchProject(options, {
     onBuild: async (result) => {
-      await writeGraphOutput(output, result.graph);
+      const drift = compareGraphs(previousGraph, result.graph);
+      previousGraph = result.graph;
+
+      await Promise.all([
+        writeGraphOutput(output, result.graph),
+        writeGraphOutput(driftOutput, drift.graph),
+      ]);
+
       logResult(result, 'Refreshed');
+      const totalNodeDrift = drift.summary.addedNodes + drift.summary.removedNodes + drift.summary.modifiedNodes;
+      const totalEdgeDrift = drift.summary.addedEdges + drift.summary.removedEdges + drift.summary.modifiedEdges;
+      if (totalNodeDrift > 0 || totalEdgeDrift > 0) {
+        console.log(
+          `Architecture drift: ${drift.summary.addedNodes} added, ${drift.summary.removedNodes} removed, ${drift.summary.modifiedNodes} modified nodes; `
+          + `${drift.summary.addedEdges} added, ${drift.summary.removedEdges} removed, ${drift.summary.modifiedEdges} modified connections.`,
+        );
+      }
+
       server.ws.send({
         type: 'custom',
         event: 'archmesh:graph',

@@ -2,7 +2,7 @@
 
 **A local-first visual architecture explorer for modern software projects.**
 
-ArchMesh scans a codebase on your machine and turns it into an interactive map of how the system is actually put together: product areas, routes, services, APIs, data stores, integrations, source files, dependencies, errors, and change impact.
+ArchMesh scans a codebase on your machine and turns it into an interactive map of how the system is actually put together: product areas, routes, services, APIs, data stores, integrations, source files, dependencies, failures, source changes, and architecture drift.
 
 > **See how your system connects. See when it doesn't.**
 
@@ -10,15 +10,16 @@ ArchMesh is built for developers, architects, designers, and AI coding agents wh
 
 ## Why ArchMesh
 
-Large applications are difficult to reason about from source files alone. A change in one service may affect several features. A Firestore collection may be read in one product area and written in another. An API error may begin in one file but affect an entirely different user-facing workflow.
+Large applications are difficult to reason about from source files alone. A change in one service may affect several features. A Firestore collection may be read in one product area and written in another. An API error may begin in one file but affect an entirely different user-facing workflow. And during active development, the architecture itself can change without anyone noticing the new dependency or removed route.
 
 ArchMesh makes those relationships visible.
 
-It keeps the exact scanned code graph as its evidence layer, then projects that graph into views that answer different questions:
+It keeps the exact scanned code graph as its evidence layer, then derives views that answer different questions:
 
 - **Architecture** — How is the product organized?
 - **Topology** — Which features touch which data stores and external systems?
-- **Changes** — What changed, and what else depends on it?
+- **Changes** — What source changed, and what else depends on it?
+- **Drift** — What architecture was added, removed, or modified between live scans?
 - **Code** — What are the exact file-level dependencies?
 - **Health** — What is directly failing, and what may be affected downstream?
 
@@ -26,7 +27,7 @@ The core experience runs locally. Your source code does not need to be uploaded 
 
 ## Current status
 
-ArchMesh is early, but it is already runnable and useful on TypeScript/JavaScript projects.
+ArchMesh is pre-1.0, but it is already runnable and useful on TypeScript/JavaScript projects.
 
 ### Visual exploration
 
@@ -35,7 +36,7 @@ ArchMesh is early, but it is already runnable and useful on TypeScript/JavaScrip
 - Search and node inspection
 - Selectable graph connections
 - Directed inbound/outbound dependency inspection
-- Architecture, Topology, Changes, and Code views
+- Architecture, Topology, Changes, Drift, and Code views
 - Feature drill-down without expanding unrelated implementation details
 - Errors-only filtering
 - Live graph refresh in watch mode without a full page reload
@@ -97,9 +98,9 @@ ArchMesh currently supports two local health-input paths:
 - TypeScript compiler diagnostics via `--diagnostics`
 - Generic health signals through `.archmesh/health.json` or `--health <file>`
 
-### Change impact
+### Git change impact
 
-ArchMesh keeps source-control change state separate from runtime health:
+Source-control change state is deliberately separate from runtime health:
 
 - `changed` — directly modified source
 - `affected` — reverse dependents of changed source
@@ -110,9 +111,33 @@ The **Changes** view uses a separate visual language:
 
 - blue = directly changed
 - purple = structurally affected
-- red/orange still represent health and take visual priority when a real failure exists
+- red/orange still represent runtime health and take priority when a real failure exists
 
-ArchMesh can map either the current working tree or changes since a Git base ref.
+Change state also rolls up into Architecture and Topology so a feature or product area can show direct changed-member and affected-member counts.
+
+### Live architecture drift
+
+When ArchMesh runs with `--watch`, each successful graph rebuild is compared with the previous successful scan.
+
+The **Drift** view answers a different question from Git change impact: not *which files changed*, but *how the architecture changed*.
+
+Drift states are:
+
+- `added` — a node or structural relationship appeared
+- `removed` — it existed in the previous scan and no longer exists
+- `modified` — its structural metadata changed while its stable identity remained
+- `stable` — unchanged one-hop context shown to explain a drifted entity
+
+The Drift view uses its own colors:
+
+- teal = added
+- pink = removed
+- gold = modified
+- muted gray = stable context
+
+Removed routes, services, and connections remain selectable as historical ghost entities in the drift graph so disappearance is understandable rather than silently omitted.
+
+Runtime health, Git change impact, and architecture drift are independent dimensions. A red connection does not mean the architecture drifted, and a removed route does not imply a runtime failure.
 
 ## Run ArchMesh locally
 
@@ -163,15 +188,26 @@ Use `--watch` to keep the map synchronized with source and relevant project conf
 npm run atlas -- /absolute/path/to/project --watch
 ```
 
-ArchMesh debounces filesystem events, serializes rebuilds, rewrites the local graph, and sends a custom Vite event to the viewer. The browser re-fetches graph data without a full page reload, so the current graph mode remains selected and a node/edge selection is preserved when the entity still exists.
+ArchMesh debounces filesystem events, serializes rebuilds, rewrites the local graph, compares each successful scan with the previous successful scan, and sends a custom Vite event to the viewer. The browser re-fetches graph and drift data without a full page reload, so the active graph mode remains selected and a node/edge selection is preserved when that entity still exists.
 
-Watch mode ignores generated/vendor paths such as `node_modules`, `.git`, `.next`, `dist`, `build`, `coverage`, and `.turbo`, along with ArchMesh's own generated graph file.
+Watch mode generates two gitignored local artifacts:
 
-You can combine watch mode with other overlays:
+```text
+public/archmesh.json
+public/archmesh-drift.json
+```
+
+The drift artifact is reset when a new watch session starts so stale history cannot leak from an earlier run.
+
+Watch mode ignores generated/vendor paths such as `node_modules`, `.git`, `.next`, `dist`, `build`, `coverage`, and `.turbo`, along with ArchMesh's own generated graph files.
+
+You can combine watch mode with change and health overlays:
 
 ```bash
 npm run atlas -- /path/to/project --watch --changes --diagnostics
 ```
+
+Current watch mode performs a full scan on each debounced rebuild. Incremental parsing and content-hash invalidation are planned optimizations.
 
 ## Visualize Git change impact
 
@@ -187,7 +223,7 @@ Compare the current branch to a base ref:
 npm run atlas -- /absolute/path/to/project --changes-from main
 ```
 
-Combine either mode with `--watch` to see the Changes view evolve while code is edited:
+Combine either mode with `--watch` to see source impact and architecture drift evolve together:
 
 ```bash
 npm run atlas -- /absolute/path/to/project --changes --watch
@@ -289,26 +325,24 @@ Project source
       ▼
  Exact code graph
       │
-      ├─────────────┬─────────────┬──────────────┐
-      ▼             ▼             ▼              ▼
- Architecture    Topology       Changes         Code
- projection      projection     projection      view
-      │             │             │              │
-      └─────────────┴──────┬──────┴──────────────┘
-                           ▼
-                    Health overlays
-                    Change overlays
-                           │
-                           ▼
-                    Sigma.js viewer
-                           ▲
-                           │
-                    optional watch loop
+      ├────────────┬────────────┬────────────┬───────────┐
+      ▼            ▼            ▼            ▼           ▼
+ Architecture   Topology      Changes       Code       Drift
+ projection     projection    projection    view    comparison
+      │            │            │            │           │
+      └────────────┴──────┬─────┴────────────┴───────────┘
+                          ▼
+                   Health overlays
+                   Change overlays
+                          │
+                          ▼
+                   Sigma.js viewer
+                          ▲
+                          │
+                   optional watch loop
 ```
 
-The exact code graph remains the evidence layer. Architecture, Topology, and Changes are derived projections rather than replacements for the underlying relationships.
-
-That matters because an error or change discovered at file level can still be explained when the user zooms out to a feature or product view.
+The exact code graph remains the evidence layer. Architecture, Topology, Changes, and Drift are derived views rather than replacements for the underlying relationships.
 
 ## Design principles
 
@@ -336,29 +370,23 @@ A directly observed failure is `error`. A dependency that may be affected is `im
 
 `changed` / `affected` are a separate dimension from `error` / `impacted`.
 
+### Drift is structural
+
+Architecture drift is based on graph structure and structural metadata. Health evidence and Git change overlays do not by themselves create drift.
+
 ## Project structure
 
 ```text
 src/
 ├── scanner/       Source scanning and static semantics
-├── projections/   Architecture/topology/change projections
+├── projections/   Architecture/topology/change/drift projections
 ├── health/        Health signals and propagation
 ├── changes/       Git change-impact analysis
+├── drift/         Graph-to-graph structural comparison
 ├── build-graph    Shared graph-build pipeline
 ├── watch          Live filesystem rebuild pipeline
 ├── GraphCanvas    Sigma.js graph rendering
 └── App             Product UI and inspector
-
-docs/
-├── PRODUCT.md
-├── ARCHITECTURE.md
-├── GRAPH_MODEL.md
-├── SCANNER.md
-├── CONFIGURATION.md
-├── HEALTH_AND_OBSERVABILITY.md
-├── DEVELOPMENT.md
-├── ROADMAP.md
-└── UX_SKILLS.md
 ```
 
 ## Development
@@ -409,14 +437,15 @@ This keeps the source of truth in the UX Skills repository while giving coding a
 
 ## Roadmap
 
-The near-term direction is focused on making ArchMesh useful during day-to-day development rather than adding cloud infrastructure:
+The near-term direction is focused on making ArchMesh useful on real, larger projects during day-to-day development:
 
-1. improve large-repository progressive detail and layout stability;
-2. expand Firebase, HTTP, Stripe, AI, and framework adapters;
-3. ingest additional local test/build/runtime failures;
-4. add Git history / change-to-failure correlation;
-5. improve incremental scanning so watch mode does not require a full rescan;
-6. package the CLI toward an eventual `npx archmesh .` experience.
+1. incremental scanning, content hashing, and graph deltas for watch mode;
+2. progressive detail and layout stability for large repositories;
+3. source-editor navigation from graph entities;
+4. richer Firebase, Stripe, OpenAI, WorkOS, Resend, and framework semantics;
+5. test/build/browser/runtime health adapters;
+6. persisted snapshots, Git history, and change-to-failure correlation;
+7. packaging toward a one-command `npx archmesh .` experience.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full capability roadmap.
 
@@ -430,7 +459,7 @@ ArchMesh is not intended to be:
 - a guarantee that every inferred relationship is correct;
 - a copy or derivative of GitNexus.
 
-ArchMesh is an independent implementation built around a different product goal: a living, visual architecture and debugging surface that can connect code structure, product semantics, data topology, failures, and change impact.
+ArchMesh is an independent implementation built around a different product goal: a living, visual architecture and debugging surface that connects code structure, product semantics, data topology, source changes, architecture drift, and failures.
 
 ## Contributing
 

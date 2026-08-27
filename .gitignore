@@ -6,3 +6,4 @@ coverage
 *.log
 .archmesh/cache
 public/archmesh.json
+public/archmesh-drift.json

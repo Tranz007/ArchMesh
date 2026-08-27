@@ -12,7 +12,7 @@ ArchMesh is pre-1.0 and its architecture may evolve quickly. Entries should stil
 
 - Local-first React/Vite architecture viewer.
 - Sigma.js + Graphology graph rendering with ForceAtlas2 layout.
-- Architecture, Topology, Changes, and Code views.
+- Architecture, Topology, Changes, Drift, and Code views.
 - Search, node inspection, directional dependency inspection, and selectable graph connections.
 - Feature drill-down that reveals exact implementation without expanding unrelated product areas.
 - Errors-only filtering.
@@ -56,7 +56,7 @@ ArchMesh is pre-1.0 and its architecture may evolve quickly. Entries should stil
 - Feature/product change counts in the inspector.
 - Cross-feature relationships preserve change impact.
 
-#### Live development
+#### Live architecture and drift
 
 - `--watch` mode.
 - Debounced, serialized rebuilds with generated/vendor path filtering.
@@ -64,6 +64,13 @@ ArchMesh is pre-1.0 and its architecture may evolve quickly. Entries should stil
 - Viewer graph refresh through a Vite custom event without a full page reload.
 - Active graph mode preserved across refreshes.
 - Node/edge selection preserved while the selected identity still exists.
+- Graph-to-graph drift comparison between consecutive successful watch scans.
+- Independent `stable`, `added`, `removed`, and `modified` architecture states.
+- Structural comparison based on stable node identity and structural edge signatures rather than generated edge IDs.
+- Structural fingerprints ignore runtime health and Git change overlays.
+- Dedicated Drift view with teal added, pink removed, gold modified, and muted one-hop stable context.
+- Removed nodes and connections retained as selectable historical ghost entities.
+- Separate gitignored `public/archmesh-drift.json` generated locally and reset at watch-session start.
 
 #### Project and contributor experience
 
@@ -75,16 +82,16 @@ ArchMesh is pre-1.0 and its architecture may evolve quickly. Entries should stil
 
 ### Changed
 
-- The exact file graph remains the evidence layer while Architecture, Topology, and Changes are derived projections.
-- Runtime health and source-control change state are intentionally separate dimensions; changing code does not imply failure and downstream impact does not imply direct error.
+- The exact file graph remains the evidence layer while Architecture, Topology, Changes, and Drift are derived views.
+- Runtime health, source-control change state, and architecture drift are intentionally independent dimensions.
 - Current watch mode performs full graph rebuilds; incremental scanning is a future optimization rather than an undocumented assumption.
 
 ### Next
 
-- Architecture drift and graph-to-graph comparison.
-- Incremental scan/content-hash caching for watch mode.
+- Incremental scan/content-hash caching and graph deltas for watch mode.
+- Large-repository progressive disclosure and layout stability.
+- Source-editor navigation.
 - Richer Firebase, Stripe, OpenAI, WorkOS, and Resend semantics.
 - Test/build/browser/runtime health adapters.
-- Source-editor navigation.
-- Large-repository performance and progressive-detail work.
+- Persisted snapshots, Git history, and change-to-failure correlation.
 - Packaging toward a one-command `npx archmesh .` experience.

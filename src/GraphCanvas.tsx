@@ -2,7 +2,12 @@ import { useEffect, useRef } from 'react';
 import Graph from 'graphology';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import Sigma from 'sigma';
-import type { ArchGraphData, ChangeState, HealthState } from './types';
+import type {
+  ArchGraphData,
+  ChangeState,
+  DriftState,
+  HealthState,
+} from './types';
 
 const healthColor: Record<HealthState, string> = {
   healthy: '#7f8da8',
@@ -16,6 +21,13 @@ const changeColor: Record<ChangeState, string> = {
   unchanged: '#7f8da8',
   changed: '#58a6ff',
   affected: '#a78bfa',
+};
+
+const driftColor: Record<DriftState, string> = {
+  stable: '#59657a',
+  added: '#34d399',
+  removed: '#f472b6',
+  modified: '#fbbf24',
 };
 
 const kindSize: Record<string, number> = {
@@ -41,7 +53,14 @@ function stableCoordinate(id: string, salt: number) {
   return ((hash >>> 0) % 10000) / 10000;
 }
 
-function graphColor(health: HealthState, change: ChangeState | undefined, healthyDefault: string) {
+function graphColor(
+  health: HealthState,
+  change: ChangeState | undefined,
+  drift: DriftState | undefined,
+  healthyDefault: string,
+  visualMode: 'default' | 'drift',
+) {
+  if (visualMode === 'drift') return driftColor[drift ?? 'stable'];
   if (health === 'error' || health === 'warning' || health === 'impacted') return healthColor[health];
   if (change === 'changed' || change === 'affected') return changeColor[change];
   return healthyDefault;
@@ -50,6 +69,7 @@ function graphColor(health: HealthState, change: ChangeState | undefined, health
 interface GraphCanvasProps {
   data: ArchGraphData;
   errorsOnly: boolean;
+  visualMode?: 'default' | 'drift';
   selectedNodeId?: string;
   selectedEdgeId?: string;
   onSelectNode: (nodeId?: string) => void;
@@ -59,6 +79,7 @@ interface GraphCanvasProps {
 export function GraphCanvas({
   data,
   errorsOnly,
+  visualMode = 'default',
   selectedNodeId,
   selectedEdgeId,
   onSelectNode,
@@ -88,35 +109,53 @@ export function GraphCanvas({
 
     for (const node of data.nodes) {
       if (errorsOnly && !visibleNodes.has(node.id)) continue;
+      const drift = node.drift ?? 'stable';
+      const driftScale = visualMode === 'drift'
+        ? drift === 'added'
+          ? 1.15
+          : drift === 'removed'
+            ? 0.95
+            : drift === 'modified'
+              ? 1.08
+              : 1
+        : 1;
       graph.addNode(node.id, {
         label: node.label,
         kind: node.kind,
         health: node.health,
         change: node.change ?? 'unchanged',
+        drift,
         path: node.path,
         x: stableCoordinate(node.id, 17),
         y: stableCoordinate(node.id, 71),
-        size: (kindSize[node.kind] ?? 7) * (node.change === 'changed' ? 1.12 : 1),
-        color: graphColor(node.health, node.change, healthColor[node.health]),
+        size: (kindSize[node.kind] ?? 7) * (node.change === 'changed' ? 1.12 : 1) * driftScale,
+        color: graphColor(node.health, node.change, node.drift, healthColor[node.health], visualMode),
       });
     }
 
     for (const edge of data.edges) {
       if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) continue;
       if (errorsOnly && edge.health === 'healthy') continue;
+      const drift = edge.drift ?? 'stable';
+      const driftSize = visualMode === 'drift'
+        ? drift === 'stable' ? 0.7 : drift === 'modified' ? 2.4 : 2
+        : 1;
       graph.addEdgeWithKey(edge.id, edge.source, edge.target, {
         label: edge.label ?? edge.relation,
         relation: edge.relation,
         health: edge.health,
         change: edge.change ?? 'unchanged',
-        size: edge.health === 'error'
-          ? 3
-          : edge.health === 'impacted'
-            ? 2
-            : edge.change === 'affected'
-              ? 1.8
-              : 1,
-        color: graphColor(edge.health, edge.change, '#38445b'),
+        drift,
+        size: visualMode === 'drift'
+          ? driftSize
+          : edge.health === 'error'
+            ? 3
+            : edge.health === 'impacted'
+              ? 2
+              : edge.change === 'affected'
+                ? 1.8
+                : 1,
+        color: graphColor(edge.health, edge.change, edge.drift, '#38445b', visualMode),
       });
     }
 
@@ -192,7 +231,7 @@ export function GraphCanvas({
     });
 
     return () => renderer.kill();
-  }, [data, errorsOnly, selectedNodeId, selectedEdgeId, onSelectNode, onSelectEdge]);
+  }, [data, errorsOnly, visualMode, selectedNodeId, selectedEdgeId, onSelectNode, onSelectEdge]);
 
   return <div ref={containerRef} className="graph-canvas" aria-label="Interactive architecture graph" />;
 }
