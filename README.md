@@ -18,9 +18,9 @@ It keeps the exact scanned code graph as its evidence layer, then projects that 
 
 - **Architecture** — How is the product organized?
 - **Topology** — Which features touch which data stores and external systems?
+- **Changes** — What changed, and what else depends on it?
 - **Code** — What are the exact file-level dependencies?
 - **Health** — What is directly failing, and what may be affected downstream?
-- **Change impact** — What changed, and what else depends on it?
 
 The core experience runs locally. Your source code does not need to be uploaded to an ArchMesh service.
 
@@ -35,9 +35,10 @@ ArchMesh is early, but it is already runnable and useful on TypeScript/JavaScrip
 - Search and node inspection
 - Selectable graph connections
 - Directed inbound/outbound dependency inspection
-- Architecture, Topology, and Code views
+- Architecture, Topology, Changes, and Code views
 - Feature drill-down without expanding unrelated implementation details
 - Errors-only filtering
+- Live graph refresh in watch mode without a full page reload
 
 ### Architecture understanding
 
@@ -98,14 +99,20 @@ ArchMesh currently supports two local health-input paths:
 
 ### Change impact
 
-ArchMesh also keeps source-control change state separate from runtime health:
+ArchMesh keeps source-control change state separate from runtime health:
 
 - `changed` — directly modified source
 - `affected` — reverse dependents of changed source
 
 A file can therefore be changed without being presented as broken, or changed *and* failing at the same time.
 
-Git working-tree and base-ref change detection are under active development.
+The **Changes** view uses a separate visual language:
+
+- blue = directly changed
+- purple = structurally affected
+- red/orange still represent health and take visual priority when a real failure exists
+
+ArchMesh can map either the current working tree or changes since a Git base ref.
 
 ## Run ArchMesh locally
 
@@ -147,6 +154,46 @@ Then open:
 ```text
 http://localhost:4242
 ```
+
+## Keep ArchMesh live while you work
+
+Use `--watch` to keep the map synchronized with source and relevant project configuration changes:
+
+```bash
+npm run atlas -- /absolute/path/to/project --watch
+```
+
+ArchMesh debounces filesystem events, serializes rebuilds, rewrites the local graph, and sends a custom Vite event to the viewer. The browser re-fetches graph data without a full page reload, so the current graph mode remains selected and a node/edge selection is preserved when the entity still exists.
+
+Watch mode ignores generated/vendor paths such as `node_modules`, `.git`, `.next`, `dist`, `build`, `coverage`, and `.turbo`, along with ArchMesh's own generated graph file.
+
+You can combine watch mode with other overlays:
+
+```bash
+npm run atlas -- /path/to/project --watch --changes --diagnostics
+```
+
+## Visualize Git change impact
+
+Map the current working tree, including staged, unstaged, and untracked files:
+
+```bash
+npm run atlas -- /absolute/path/to/project --changes
+```
+
+Compare the current branch to a base ref:
+
+```bash
+npm run atlas -- /absolute/path/to/project --changes-from main
+```
+
+Combine either mode with `--watch` to see the Changes view evolve while code is edited:
+
+```bash
+npm run atlas -- /absolute/path/to/project --changes --watch
+```
+
+The change-impact engine walks reverse dependencies from directly changed source. It describes structural impact; it does not claim that affected behavior is broken.
 
 ## Show TypeScript errors on the graph
 
@@ -242,21 +289,24 @@ Project source
       ▼
  Exact code graph
       │
-      ├─────────────┬──────────────┐
-      ▼             ▼              ▼
- Architecture    Topology         Code
- projection      projection       view
-      │             │              │
-      └─────────────┼──────────────┘
-                    ▼
-             Health overlays
-             Change overlays
-                    │
-                    ▼
-            Sigma.js viewer
+      ├─────────────┬─────────────┬──────────────┐
+      ▼             ▼             ▼              ▼
+ Architecture    Topology       Changes         Code
+ projection      projection     projection      view
+      │             │             │              │
+      └─────────────┴──────┬──────┴──────────────┘
+                           ▼
+                    Health overlays
+                    Change overlays
+                           │
+                           ▼
+                    Sigma.js viewer
+                           ▲
+                           │
+                    optional watch loop
 ```
 
-The exact code graph remains the evidence layer. Architecture and Topology are derived projections rather than replacements for the underlying relationships.
+The exact code graph remains the evidence layer. Architecture, Topology, and Changes are derived projections rather than replacements for the underlying relationships.
 
 That matters because an error or change discovered at file level can still be explained when the user zooms out to a feature or product view.
 
@@ -291,9 +341,11 @@ A directly observed failure is `error`. A dependency that may be affected is `im
 ```text
 src/
 ├── scanner/       Source scanning and static semantics
-├── projections/   Architecture/topology graph projections
+├── projections/   Architecture/topology/change projections
 ├── health/        Health signals and propagation
 ├── changes/       Git change-impact analysis
+├── build-graph    Shared graph-build pipeline
+├── watch          Live filesystem rebuild pipeline
 ├── GraphCanvas    Sigma.js graph rendering
 └── App             Product UI and inspector
 
@@ -359,13 +411,12 @@ This keeps the source of truth in the UX Skills repository while giving coding a
 
 The near-term direction is focused on making ArchMesh useful during day-to-day development rather than adding cloud infrastructure:
 
-1. finish Git change-impact visualization;
-2. add file watching and incremental rescans;
-3. improve large-repository progressive detail and layout stability;
-4. expand Firebase, HTTP, Stripe, AI, and framework adapters;
-5. ingest additional local test/build/runtime failures;
-6. add Git history / change-to-failure correlation;
-7. package the CLI toward an eventual `npx archmesh .` experience.
+1. improve large-repository progressive detail and layout stability;
+2. expand Firebase, HTTP, Stripe, AI, and framework adapters;
+3. ingest additional local test/build/runtime failures;
+4. add Git history / change-to-failure correlation;
+5. improve incremental scanning so watch mode does not require a full rescan;
+6. package the CLI toward an eventual `npx archmesh .` experience.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full capability roadmap.
 
