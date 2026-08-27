@@ -16,6 +16,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { GraphCanvas } from './GraphCanvas';
+import { SourceOpenAction } from './SourceOpenAction';
 import { projectArchitecture } from './projections/architecture';
 import { projectChanges } from './projections/changes';
 import { projectDrift } from './projections/drift';
@@ -543,6 +544,9 @@ export default function App() {
               <ChangeBadge change={selectedNode.change} />
               <DriftBadge drift={selectedNode.drift} />
               {selectedNode.path && <code className="path">{selectedNode.path}</code>}
+              {selectedNode.path && source === 'scan' && selectedNode.drift !== 'removed' && (
+                <SourceOpenAction key={selectedNode.path} path={selectedNode.path} />
+              )}
 
               <HealthEvidence health={selectedNode.health} metadata={selectedNode.metadata} />
               <DriftNote drift={selectedNode.drift} />
