@@ -6,15 +6,15 @@ ArchMesh scans a codebase on your machine and turns it into an interactive map o
 
 > **See how your system connects. See when it doesn't.**
 
-ArchMesh is built for developers, architects, designers, and AI coding agents who need to understand a real codebase without repeatedly reconstructing the architecture from folders and search results.
+ArchMesh is built for developers, architects, designers, and AI coding agents who need to understand a real codebase without repeatedly reconstructing the architecture from folders, search results, and logs.
 
 ## Why ArchMesh
 
-Large applications are difficult to reason about from source files alone. A change in one service may affect several features. A Firestore collection may be read in one product area and written in another. An API error may begin in one file but affect an entirely different user-facing workflow. And during active development, the architecture itself can change without anyone noticing the new dependency or removed route.
+Large applications are difficult to hold in your head. A shared service can affect several features. A data collection can be read in one area and written in another. A runtime error can begin in one file and affect a distant user workflow. During active development, architecture itself can change without anyone noticing a new dependency or removed route.
 
-ArchMesh makes those relationships visible.
+ArchMesh makes those relationships visible while keeping the exact scanned code graph as the evidence layer underneath higher-level views.
 
-It keeps the exact scanned code graph as its evidence layer, then derives views that answer different questions:
+### Views
 
 - **Architecture** — How is the product organized?
 - **Topology** — Which features touch which data stores and external systems?
@@ -25,119 +25,64 @@ It keeps the exact scanned code graph as its evidence layer, then derives views 
 
 The core experience runs locally. Your source code does not need to be uploaded to an ArchMesh service.
 
-## Current status
+## Current capabilities
 
-ArchMesh is pre-1.0, but it is already runnable and useful on TypeScript/JavaScript projects.
+ArchMesh is pre-1.0, but already supports a useful TypeScript/JavaScript baseline:
 
-### Visual exploration
+- interactive Sigma.js + Graphology graph rendering;
+- deterministic seed positions with ForceAtlas2 layout;
+- search, node inspection, selectable connections, and directional dependency inspection;
+- Architecture, Topology, Changes, Drift, and Code views;
+- feature drill-down without expanding unrelated implementation detail;
+- TypeScript/JavaScript imports, exports, and nested dynamic imports;
+- relative imports and TypeScript `baseUrl` / `paths` aliases;
+- Next.js App Router pages, API routes, route paths, HTTP methods, and server-action evidence;
+- internal `fetch('/api/...')` call mapping and external HTTP host discovery;
+- Firebase/Firestore collection read/write/listener relationships;
+- first-class integration nodes for Firebase, Stripe, OpenAI, WorkOS, Resend, and Vercel;
+- optional project-defined product/feature semantics through `archmesh.config.json`;
+- TypeScript diagnostics and generic health-signal ingestion;
+- Git working-tree and base-ref change impact;
+- live watch mode with browser refresh without a full page reload;
+- architecture drift comparison between consecutive successful live scans.
 
-- Interactive Sigma.js + Graphology graph rendering
-- Stable ForceAtlas2 layout
-- Search and node inspection
-- Selectable graph connections
-- Directed inbound/outbound dependency inspection
-- Architecture, Topology, Changes, Drift, and Code views
-- Feature drill-down without expanding unrelated implementation details
-- Errors-only filtering
-- Live graph refresh in watch mode without a full page reload
-
-### Architecture understanding
-
-- TypeScript and JavaScript source scanning
-- Static imports, exports, and nested dynamic imports
-- Relative-import resolution
-- TypeScript `baseUrl` / `paths` alias resolution
-- Next.js App Router page and API route recognition
-- Next.js route-path extraction, including route groups
-- HTTP method detection for route handlers
-- Server-action directive detection
-- Component, service, data, route, API, and integration classification
-- Optional project-defined feature/product semantics through `archmesh.config.json`
-
-### Data and integration topology
-
-- Internal `fetch('/api/...')` call detection
-- External HTTP-host detection
-- Firebase / Firestore collection discovery
-- Firestore read, write, and listener relationships
-- First-class integrations for Firebase, Stripe, OpenAI, WorkOS, Resend, and Vercel
-
-### Health and failures
-
-Health is built into the graph model rather than added as a separate dashboard.
+## Health is part of the graph
 
 ArchMesh distinguishes:
 
-- `healthy` — no current evidence of a problem
-- `warning` — degraded or suspicious
-- `error` — directly observed failure
-- `impacted` — downstream blast radius inferred from a direct failure
-- `unknown` — insufficient evidence
+- `healthy` — no current evidence of a problem;
+- `warning` — degraded or suspicious;
+- `error` — directly observed failure;
+- `impacted` — downstream blast radius inferred from a direct failure;
+- `unknown` — insufficient evidence.
 
-A direct failure can therefore appear like this:
+Example:
 
 ```text
-Stripe
-  │
-  │ ERROR
-  ▼
+Payment provider
+      │
+      │ ERROR
+      ▼
 Billing API
-  │
-  │ ERROR
-  ▼
+      │
+      │ ERROR
+      ▼
 Subscription service
-  │
-  ├ - - impacted - - ► Hiring
-  └ - - impacted - - ► Story
+      │
+      ├ - - impacted - - ► Orders
+      └ - - impacted - - ► Account
 ```
 
-The red connection itself is selectable. When evidence exists, the inspector can show why that relationship is red rather than presenting color without explanation.
+A red connection is selectable. When evidence exists, the inspector explains why the relationship is red rather than using color without context.
 
-ArchMesh currently supports two local health-input paths:
+Health, source-control impact, and architecture drift are deliberately independent dimensions:
 
-- TypeScript compiler diagnostics via `--diagnostics`
-- Generic health signals through `.archmesh/health.json` or `--health <file>`
+```text
+Runtime health       Git impact        Architecture drift
+error / impacted     changed / affected added / removed / modified
+```
 
-### Git change impact
-
-Source-control change state is deliberately separate from runtime health:
-
-- `changed` — directly modified source
-- `affected` — reverse dependents of changed source
-
-A file can therefore be changed without being presented as broken, or changed *and* failing at the same time.
-
-The **Changes** view uses a separate visual language:
-
-- blue = directly changed
-- purple = structurally affected
-- red/orange still represent runtime health and take priority when a real failure exists
-
-Change state also rolls up into Architecture and Topology so a feature or product area can show direct changed-member and affected-member counts.
-
-### Live architecture drift
-
-When ArchMesh runs with `--watch`, each successful graph rebuild is compared with the previous successful scan.
-
-The **Drift** view answers a different question from Git change impact: not *which files changed*, but *how the architecture changed*.
-
-Drift states are:
-
-- `added` — a node or structural relationship appeared
-- `removed` — it existed in the previous scan and no longer exists
-- `modified` — its structural metadata changed while its stable identity remained
-- `stable` — unchanged one-hop context shown to explain a drifted entity
-
-The Drift view uses its own colors:
-
-- teal = added
-- pink = removed
-- gold = modified
-- muted gray = stable context
-
-Removed routes, services, and connections remain selectable as historical ghost entities in the drift graph so disappearance is understandable rather than silently omitted.
-
-Runtime health, Git change impact, and architecture drift are independent dimensions. A red connection does not mean the architecture drifted, and a removed route does not imply a runtime failure.
+A changed file is not automatically broken. An affected feature is not automatically failing. A removed route is not automatically a runtime error.
 
 ## Run ArchMesh locally
 
@@ -145,28 +90,16 @@ Runtime health, Git change impact, and architecture drift are independent dimens
 
 - Node.js **22.18+**
 - npm
-
-Clone ArchMesh:
+- a modern browser with WebGL support
 
 ```bash
 git clone https://github.com/Tranz007/ArchMesh.git
 cd ArchMesh
 npm install
-```
-
-Scan another local project and launch the viewer:
-
-```bash
 npm run atlas -- /absolute/path/to/your/project
 ```
 
-ArchMesh will:
-
-1. scan the target repository;
-2. generate a local graph;
-3. write it to the gitignored `public/archmesh.json`;
-4. start the viewer on port `4242`;
-5. open the browser.
+ArchMesh scans the target, writes a gitignored local graph, starts the viewer on port `4242`, and opens the browser.
 
 If no target is provided, ArchMesh scans itself:
 
@@ -174,44 +107,26 @@ If no target is provided, ArchMesh scans itself:
 npm run atlas
 ```
 
-Then open:
-
-```text
-http://localhost:4242
-```
-
-## Keep ArchMesh live while you work
-
-Use `--watch` to keep the map synchronized with source and relevant project configuration changes:
+### Keep the map live
 
 ```bash
 npm run atlas -- /absolute/path/to/project --watch
 ```
 
-ArchMesh debounces filesystem events, serializes rebuilds, rewrites the local graph, compares each successful scan with the previous successful scan, and sends a custom Vite event to the viewer. The browser re-fetches graph and drift data without a full page reload, so the active graph mode remains selected and a node/edge selection is preserved when that entity still exists.
+Watch mode debounces filesystem events, serializes rebuilds, refreshes the graph in the browser without a page reload, and compares each successful scan with the previous one for structural drift.
 
-Watch mode generates two gitignored local artifacts:
+Local generated artifacts:
 
 ```text
 public/archmesh.json
 public/archmesh-drift.json
 ```
 
-The drift artifact is reset when a new watch session starts so stale history cannot leak from an earlier run.
+Current watch mode performs a full scan on each debounced rebuild. Incremental invalidation is a planned performance improvement.
 
-Watch mode ignores generated/vendor paths such as `node_modules`, `.git`, `.next`, `dist`, `build`, `coverage`, and `.turbo`, along with ArchMesh's own generated graph files.
+### Visualize Git change impact
 
-You can combine watch mode with change and health overlays:
-
-```bash
-npm run atlas -- /path/to/project --watch --changes --diagnostics
-```
-
-Current watch mode performs a full scan on each debounced rebuild. Incremental parsing and content-hash invalidation are planned optimizations.
-
-## Visualize Git change impact
-
-Map the current working tree, including staged, unstaged, and untracked files:
+Working tree, including staged, unstaged, and untracked files:
 
 ```bash
 npm run atlas -- /absolute/path/to/project --changes
@@ -223,33 +138,23 @@ Compare the current branch to a base ref:
 npm run atlas -- /absolute/path/to/project --changes-from main
 ```
 
-Combine either mode with `--watch` to see source impact and architecture drift evolve together:
+Combine modes when useful:
 
 ```bash
-npm run atlas -- /absolute/path/to/project --changes --watch
+npm run atlas -- /absolute/path/to/project --watch --changes --diagnostics
 ```
 
-The change-impact engine walks reverse dependencies from directly changed source. It describes structural impact; it does not claim that affected behavior is broken.
-
-## Show TypeScript errors on the graph
-
-Run a project scan with compiler diagnostics:
+### Show TypeScript errors
 
 ```bash
 npm run atlas -- /absolute/path/to/project --diagnostics
 ```
 
-TypeScript diagnostics are converted into ArchMesh health signals. Directly failing files become errors; reverse dependents can be shown as impacted.
+TypeScript diagnostics become direct health signals on matching source nodes. Reverse dependents can be shown as `impacted`.
 
-## Feed ArchMesh other health signals
+### Feed other health signals
 
-ArchMesh looks for:
-
-```text
-.archmesh/health.json
-```
-
-inside the scanned project, or you can specify another file:
+ArchMesh looks for `<project>/.archmesh/health.json`, or accepts an explicit file:
 
 ```bash
 npm run atlas -- /absolute/path/to/project --health ./signals.json
@@ -258,27 +163,27 @@ npm run atlas -- /absolute/path/to/project --health ./signals.json
 Example:
 
 ```json
-[
-  {
-    "id": "billing-webhook-500",
-    "severity": "error",
-    "source": "runtime",
-    "message": "Stripe webhook returned 500",
-    "edge": {
-      "source": { "path": "src/services/billing.ts" },
-      "target": { "path": "src/app/api/stripe/route.ts" }
+{
+  "signals": [
+    {
+      "id": "checkout-submit-500",
+      "severity": "error",
+      "source": "runtime",
+      "message": "POST /api/checkout/submit returned 500",
+      "edge": {
+        "source": { "path": "src/app/checkout/page.tsx" },
+        "target": { "path": "src/app/api/checkout/submit/route.ts" }
+      }
     }
-  }
-]
+  ]
+}
 ```
 
-ArchMesh keeps direct error evidence distinct from inferred downstream impact.
-
-See [`docs/HEALTH_AND_OBSERVABILITY.md`](docs/HEALTH_AND_OBSERVABILITY.md) for the signal model and propagation rules.
+See [`docs/HEALTH_AND_OBSERVABILITY.md`](docs/HEALTH_AND_OBSERVABILITY.md).
 
 ## Teach ArchMesh your product language
 
-Automatic detection is useful, but a product team usually knows its architecture better than a generic scanner.
+Automatic detection is useful, but teams often know their product boundaries better than a generic scanner.
 
 Add `archmesh.config.json` to the project being scanned:
 
@@ -286,25 +191,25 @@ Add `archmesh.config.json` to the project being scanned:
 {
   "features": [
     {
-      "key": "story",
-      "label": "Story",
-      "paths": ["src/app/story/**", "src/features/story/**"]
+      "id": "catalog",
+      "label": "Catalog",
+      "paths": ["src/app/catalog/**", "src/features/catalog/**"]
     },
     {
-      "key": "hiring",
-      "label": "Hiring",
-      "paths": ["src/app/hiring/**", "src/features/hiring/**"]
+      "id": "orders",
+      "label": "Orders",
+      "paths": ["src/app/orders/**", "src/features/orders/**"]
     },
     {
-      "key": "campus",
-      "label": "Campus",
-      "paths": ["src/app/campus/**", "src/features/campus/**"]
+      "id": "accounts",
+      "label": "Accounts",
+      "paths": ["src/app/accounts/**", "src/features/accounts/**"]
     }
   ]
 }
 ```
 
-Configured semantics take precedence over path inference, and ArchMesh records whether a grouping came from explicit configuration or automatic detection.
+Configured semantics take precedence over path inference, and ArchMesh records whether grouping came from project configuration or automatic detection.
 
 See [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
 
@@ -332,8 +237,7 @@ Project source
       │            │            │            │           │
       └────────────┴──────┬─────┴────────────┴───────────┘
                           ▼
-                   Health overlays
-                   Change overlays
+                   health/change overlays
                           │
                           ▼
                    Sigma.js viewer
@@ -342,52 +246,49 @@ Project source
                    optional watch loop
 ```
 
-The exact code graph remains the evidence layer. Architecture, Topology, Changes, and Drift are derived views rather than replacements for the underlying relationships.
+The exact code graph remains the evidence layer. Higher-level views are projections and comparisons, not replacements for the underlying relationships.
 
 ## Design principles
 
-### Local first
+**Local first.** Core architecture exploration must work without a hosted service, account, graph database, LLM, or source-code upload.
 
-The core product should remain useful without an ArchMesh cloud service, account, or hosted graph database.
+**Visual first.** The graph is the primary interface, not decoration around a report.
 
-### Visual first
+**Evidence over inference.** Prefer an omitted relationship over a convincing fabricated one. Keep configured, detected, inferred, and unknown information distinct when it matters.
 
-The graph is the primary interface, not decoration around a text report.
+**Human architecture over file hairballs.** Start with product areas and features; reveal routes, services, data, files, and source detail progressively.
 
-### Evidence over inference
-
-ArchMesh should prefer missing a relationship over fabricating one. Explicit project configuration must remain distinguishable from heuristic detection.
-
-### Human architecture over file hairballs
-
-A raw dependency graph is necessary but not sufficient. ArchMesh should progressively reveal product areas, features, services, routes, data, integrations, and exact implementation detail at the level appropriate to the question.
-
-### Error is not impact
-
-A directly observed failure is `error`. A dependency that may be affected is `impacted`. ArchMesh must not visually claim downstream systems failed without evidence.
-
-### Change is not failure
-
-`changed` / `affected` are a separate dimension from `error` / `impacted`.
-
-### Drift is structural
-
-Architecture drift is based on graph structure and structural metadata. Health evidence and Git change overlays do not by themselves create drift.
+**Error is not impact. Change is not failure. Drift is structural.** These meanings stay separate throughout the graph and inspector.
 
 ## Project structure
 
 ```text
 src/
-├── scanner/       Source scanning and static semantics
-├── projections/   Architecture/topology/change/drift projections
-├── health/        Health signals and propagation
+├── scanner/       source scanning and static semantics
+├── projections/   architecture/topology/change/drift projections
+├── health/        health signals and propagation
 ├── changes/       Git change-impact analysis
-├── drift/         Graph-to-graph structural comparison
-├── build-graph    Shared graph-build pipeline
-├── watch          Live filesystem rebuild pipeline
-├── GraphCanvas    Sigma.js graph rendering
-└── App             Product UI and inspector
+├── drift/         graph-to-graph structural comparison
+├── build-graph    shared graph-build pipeline
+├── watch          live filesystem rebuild pipeline
+├── GraphCanvas    Sigma.js rendering
+└── App             product UI and inspector
 ```
+
+## Documentation
+
+- [Product definition](docs/PRODUCT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Graph model](docs/GRAPH_MODEL.md)
+- [Scanner](docs/SCANNER.md)
+- [Configuration](docs/CONFIGURATION.md)
+- [Health and observability](docs/HEALTH_AND_OBSERVABILITY.md)
+- [Development](docs/DEVELOPMENT.md)
+- [Definition of Done](docs/DEFINITION_OF_DONE.md)
+- [Roadmap](docs/ROADMAP.md)
+- [UX Skills integration](docs/UX_SKILLS.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security and privacy](SECURITY.md)
 
 ## Development
 
@@ -400,66 +301,39 @@ npm run scan
 npm run dev
 ```
 
-CI validates dependency installation, TypeScript typechecking, tests, production build, and an ArchMesh self-scan on a clean GitHub runner.
+CI validates dependency installation, TypeScript typechecking, tests, production build, and an ArchMesh self-scan on a clean runner.
 
-See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
-
-## UX Skills and agent guardrails
-
-ArchMesh includes:
-
-- [`AGENTS.md`](AGENTS.md)
-- `.ux/CONTEXT.md`
-- `.ux/DESIGN-SYSTEM.md`
-- `.ux/DECISIONS.md`
-
-The repository can also install the canonical [UX Skills](https://github.com/Tranz007/ux-skills) suite:
+ArchMesh also includes [`AGENTS.md`](AGENTS.md) plus committed `.ux/` project context. The canonical [UX Skills](https://github.com/Tranz007/ux-skills) suite can be installed with:
 
 ```bash
 npm run ux:install
 ```
 
-This keeps the source of truth in the UX Skills repository while giving coding agents working on ArchMesh project-specific UX context and guardrails.
+## Definition of Done
 
-## Documentation
+ArchMesh has an explicit finish line for both individual changes and the first stable public release. See [`docs/DEFINITION_OF_DONE.md`](docs/DEFINITION_OF_DONE.md).
 
-- [Product definition](docs/PRODUCT.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Graph model](docs/GRAPH_MODEL.md)
-- [Scanner](docs/SCANNER.md)
-- [Configuration](docs/CONFIGURATION.md)
-- [Health and observability](docs/HEALTH_AND_OBSERVABILITY.md)
-- [Development](docs/DEVELOPMENT.md)
-- [Roadmap](docs/ROADMAP.md)
-- [UX Skills integration](docs/UX_SKILLS.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security and privacy](SECURITY.md)
+The short version: a feature is not done because code exists, and v0.1 is not done because the graph looks impressive. It is done when a new user can install ArchMesh, run it on a representative repository, understand the result, trust its claims, and complete the core workflows without private project knowledge or maintainer intervention.
 
 ## Roadmap
 
-The near-term direction is focused on making ArchMesh useful on real, larger projects during day-to-day development:
+Near-term work is focused on release usefulness rather than adding unrelated surfaces:
 
-1. incremental scanning, content hashing, and graph deltas for watch mode;
-2. progressive detail and layout stability for large repositories;
+1. finish and validate architecture drift;
+2. incremental scanning and graph deltas for watch mode;
 3. source-editor navigation from graph entities;
-4. richer Firebase, Stripe, OpenAI, WorkOS, Resend, and framework semantics;
-5. test/build/browser/runtime health adapters;
-6. persisted snapshots, Git history, and change-to-failure correlation;
-7. packaging toward a one-command `npx archmesh .` experience.
+4. packaging toward a one-command `npx archmesh .` experience;
+5. larger-repository performance and progressive detail;
+6. richer platform semantics and local test/build/runtime health adapters;
+7. persisted snapshots and change-to-failure history.
 
-See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full capability roadmap.
+See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## What ArchMesh is not
 
-ArchMesh is not intended to be:
+ArchMesh is not intended to be a hosted-source requirement, an AI replacement for architecture understanding, a generic observability dashboard with a graph bolted on, or a source of invented relationships.
 
-- a hosted source-code requirement;
-- an AI replacement for architecture understanding;
-- a generic dashboard with a graph bolted onto it;
-- a guarantee that every inferred relationship is correct;
-- a copy or derivative of GitNexus.
-
-ArchMesh is an independent implementation built around a different product goal: a living, visual architecture and debugging surface that connects code structure, product semantics, data topology, source changes, architecture drift, and failures.
+ArchMesh is independently implemented under the MIT license.
 
 ## Contributing
 
