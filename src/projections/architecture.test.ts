@@ -99,4 +99,118 @@ describe('projectArchitecture', () => {
     expect(story?.metadata?.semanticSource).toBe('config');
     expect(projection.nodes.some((node) => node.id === 'feature:profile')).toBe(false);
   });
+
+  it('rolls direct and affected code changes up to feature and product nodes', () => {
+    const changedGraph: ArchGraphData = {
+      project: 'Vetttd',
+      generatedAt: graph.generatedAt,
+      nodes: [
+        {
+          id: 'story-page',
+          label: 'page.tsx',
+          kind: 'route',
+          path: 'src/app/story/page.tsx',
+          health: 'healthy',
+          change: 'affected',
+        },
+        {
+          id: 'story-service',
+          label: 'story-service.ts',
+          kind: 'service',
+          path: 'src/app/story/story-service.ts',
+          health: 'healthy',
+          change: 'changed',
+        },
+        {
+          id: 'hiring-page',
+          label: 'page.tsx',
+          kind: 'route',
+          path: 'src/app/hiring/page.tsx',
+          health: 'healthy',
+          change: 'affected',
+        },
+      ],
+      edges: [
+        {
+          id: 'e1',
+          source: 'story-page',
+          target: 'story-service',
+          relation: 'imports',
+          health: 'healthy',
+          change: 'affected',
+        },
+        {
+          id: 'e2',
+          source: 'hiring-page',
+          target: 'story-service',
+          relation: 'imports',
+          health: 'healthy',
+          change: 'affected',
+        },
+      ],
+    };
+
+    const projection = projectArchitecture(changedGraph).graph;
+    const product = projection.nodes.find((node) => node.kind === 'product');
+    const story = projection.nodes.find((node) => node.id === 'feature:story');
+    const hiring = projection.nodes.find((node) => node.id === 'feature:hiring');
+    const hiringToStory = projection.edges.find(
+      (edge) => edge.source === 'feature:hiring' && edge.target === 'feature:story',
+    );
+
+    expect(story?.change).toBe('changed');
+    expect(story?.metadata?.changedMembers).toBe(1);
+    expect(story?.metadata?.affectedMembers).toBe(1);
+    expect(hiring?.change).toBe('affected');
+    expect(hiring?.metadata?.changedMembers).toBe(0);
+    expect(hiring?.metadata?.affectedMembers).toBe(1);
+    expect(product?.change).toBe('changed');
+    expect(product?.metadata?.changedFeatures).toBe(1);
+    expect(product?.metadata?.affectedFeatures).toBe(1);
+    expect(hiringToStory?.change).toBe('affected');
+  });
+
+  it('preserves member change state in a focused feature view', () => {
+    const changedGraph: ArchGraphData = {
+      project: 'Vetttd',
+      generatedAt: graph.generatedAt,
+      nodes: [
+        {
+          id: 'story-page',
+          label: 'page.tsx',
+          kind: 'route',
+          path: 'src/app/story/page.tsx',
+          health: 'healthy',
+          change: 'affected',
+        },
+        {
+          id: 'story-service',
+          label: 'story-service.ts',
+          kind: 'service',
+          path: 'src/app/story/story-service.ts',
+          health: 'healthy',
+          change: 'changed',
+        },
+      ],
+      edges: [
+        {
+          id: 'e1',
+          source: 'story-page',
+          target: 'story-service',
+          relation: 'imports',
+          health: 'healthy',
+          change: 'affected',
+        },
+      ],
+    };
+
+    const projection = projectArchitecture(changedGraph, 'feature:story').graph;
+    const feature = projection.nodes.find((node) => node.id === 'feature:story');
+    const containsService = projection.edges.find(
+      (edge) => edge.source === 'feature:story' && edge.target === 'story-service',
+    );
+
+    expect(feature?.change).toBe('changed');
+    expect(containsService?.change).toBe('changed');
+  });
 });
