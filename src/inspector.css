@@ -61,7 +61,8 @@
 .health-evidence dt { color: #77859c; font-size: 10px; text-transform: uppercase; }
 .health-evidence dd { margin: 0; color: #9ba8bc; font-size: 10px; overflow-wrap: anywhere; }
 
-.change-badge {
+.change-badge,
+.drift-badge {
   display: inline-flex;
   margin-left: 6px;
   padding: 5px 8px;
@@ -70,9 +71,13 @@
 }
 .change-badge.changed { color: #8cc8ff; background: rgba(88, 166, 255, .1); }
 .change-badge.affected { color: #c6b5ff; background: rgba(167, 139, 250, .1); }
+.drift-badge.added { color: #7be6bf; background: rgba(52, 211, 153, .1); }
+.drift-badge.removed { color: #f7a2ce; background: rgba(244, 114, 182, .1); }
+.drift-badge.modified { color: #ffd36b; background: rgba(251, 191, 36, .1); }
 
 .impact-note,
-.change-note {
+.change-note,
+.drift-note {
   margin: 14px 0 0;
   padding: 10px 11px;
   border-left: 3px solid #ff8f70;
@@ -90,6 +95,18 @@
 .change-note.changed {
   border-left-color: #58a6ff;
   background: rgba(88, 166, 255, .07);
+}
+.drift-note.added {
+  border-left-color: #34d399;
+  background: rgba(52, 211, 153, .07);
+}
+.drift-note.removed {
+  border-left-color: #f472b6;
+  background: rgba(244, 114, 182, .07);
+}
+.drift-note.modified {
+  border-left-color: #fbbf24;
+  background: rgba(251, 191, 36, .07);
 }
 
 .edge-route {
