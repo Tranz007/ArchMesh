@@ -39,10 +39,19 @@ interface GraphCanvasProps {
   data: ArchGraphData;
   errorsOnly: boolean;
   selectedNodeId?: string;
+  selectedEdgeId?: string;
   onSelectNode: (nodeId?: string) => void;
+  onSelectEdge: (edgeId?: string) => void;
 }
 
-export function GraphCanvas({ data, errorsOnly, selectedNodeId, onSelectNode }: GraphCanvasProps) {
+export function GraphCanvas({
+  data,
+  errorsOnly,
+  selectedNodeId,
+  selectedEdgeId,
+  onSelectNode,
+  onSelectEdge,
+}: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -104,7 +113,11 @@ export function GraphCanvas({ data, errorsOnly, selectedNodeId, onSelectNode }: 
       });
     }
 
-    const activeSelection = selectedNodeId && graph.hasNode(selectedNodeId) ? selectedNodeId : undefined;
+    const activeNodeSelection = selectedNodeId && graph.hasNode(selectedNodeId) ? selectedNodeId : undefined;
+    const activeEdgeSelection = selectedEdgeId && graph.hasEdge(selectedEdgeId) ? selectedEdgeId : undefined;
+    const edgeEndpoints = activeEdgeSelection
+      ? new Set([graph.source(activeEdgeSelection), graph.target(activeEdgeSelection)])
+      : undefined;
 
     const renderer = new Sigma(graph, containerRef.current, {
       renderEdgeLabels: false,
@@ -112,30 +125,54 @@ export function GraphCanvas({ data, errorsOnly, selectedNodeId, onSelectNode }: 
       minCameraRatio: 0.08,
       maxCameraRatio: 8,
       nodeReducer(node, attributes) {
-        if (!activeSelection) return attributes;
-        if (node === activeSelection) {
+        if (activeEdgeSelection && edgeEndpoints) {
+          if (edgeEndpoints.has(node)) {
+            return { ...attributes, highlighted: true, size: Number(attributes.size) * 1.25 };
+          }
+          return { ...attributes, color: '#283146', label: '', zIndex: 0 };
+        }
+
+        if (!activeNodeSelection) return attributes;
+        if (node === activeNodeSelection) {
           return { ...attributes, highlighted: true, size: Number(attributes.size) * 1.3 };
         }
-        const neighbors = new Set(graph.neighbors(activeSelection));
+        const neighbors = new Set(graph.neighbors(activeNodeSelection));
         if (neighbors.has(node)) return attributes;
         return { ...attributes, color: '#283146', label: '', zIndex: 0 };
       },
       edgeReducer(edge, attributes) {
-        if (!activeSelection) return attributes;
+        if (activeEdgeSelection) {
+          if (edge === activeEdgeSelection) {
+            return { ...attributes, size: Math.max(Number(attributes.size), 4), zIndex: 10 };
+          }
+          return { ...attributes, color: '#222a3a', hidden: false, size: 0.4, zIndex: 0 };
+        }
+
+        if (!activeNodeSelection) return attributes;
         const source = graph.source(edge);
         const target = graph.target(edge);
-        if (source === activeSelection || target === activeSelection) {
+        if (source === activeNodeSelection || target === activeNodeSelection) {
           return { ...attributes, size: Math.max(Number(attributes.size), 2) };
         }
         return { ...attributes, color: '#222a3a', hidden: false, size: 0.5 };
       },
     });
 
-    renderer.on('clickNode', ({ node }) => onSelectNode(node));
-    renderer.on('clickStage', () => onSelectNode(undefined));
+    renderer.on('clickNode', ({ node }) => {
+      onSelectEdge(undefined);
+      onSelectNode(node);
+    });
+    renderer.on('clickEdge', ({ edge }) => {
+      onSelectNode(undefined);
+      onSelectEdge(edge);
+    });
+    renderer.on('clickStage', () => {
+      onSelectNode(undefined);
+      onSelectEdge(undefined);
+    });
 
     return () => renderer.kill();
-  }, [data, errorsOnly, selectedNodeId, onSelectNode]);
+  }, [data, errorsOnly, selectedNodeId, selectedEdgeId, onSelectNode, onSelectEdge]);
 
   return <div ref={containerRef} className="graph-canvas" aria-label="Interactive architecture graph" />;
 }
