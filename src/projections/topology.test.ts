@@ -5,27 +5,27 @@ import { projectTopology } from './topology';
 describe('projectTopology', () => {
   it('aggregates code-level data and integration edges by feature', () => {
     const graph: ArchGraphData = {
-      project: 'Vetttd',
+      project: 'ExampleApp',
       generatedAt: '2026-08-27T00:00:00.000Z',
       nodes: [
-        { id: 'story-service', label: 'story.ts', kind: 'service', path: 'src/app/story/story.ts', health: 'error' },
-        { id: 'story-worker', label: 'worker.ts', kind: 'service', path: 'src/app/story/worker.ts', health: 'healthy' },
-        { id: 'hiring-page', label: 'page.tsx', kind: 'route', path: 'src/app/hiring/page.tsx', health: 'healthy' },
-        { id: 'stories', label: 'stories', kind: 'data', health: 'healthy', metadata: { provider: 'Firebase' } },
+        { id: 'catalog-service', label: 'catalog.ts', kind: 'service', path: 'src/app/catalog/catalog.ts', health: 'error' },
+        { id: 'catalog-worker', label: 'worker.ts', kind: 'service', path: 'src/app/catalog/worker.ts', health: 'healthy' },
+        { id: 'orders-page', label: 'page.tsx', kind: 'route', path: 'src/app/orders/page.tsx', health: 'healthy' },
+        { id: 'products', label: 'products', kind: 'data', health: 'healthy', metadata: { provider: 'Firebase' } },
         { id: 'stripe', label: 'Stripe', kind: 'integration', health: 'healthy' },
       ],
       edges: [
-        { id: 'e1', source: 'story-worker', target: 'stories', relation: 'writes', health: 'healthy' },
+        { id: 'e1', source: 'catalog-worker', target: 'products', relation: 'writes', health: 'healthy' },
         {
           id: 'e2',
-          source: 'story-service',
-          target: 'stories',
+          source: 'catalog-service',
+          target: 'products',
           relation: 'writes',
           health: 'error',
           metadata: { healthSource: 'runtime', healthMessage: 'Firestore write failed' },
         },
-        { id: 'e3', source: 'hiring-page', target: 'stories', relation: 'reads', health: 'healthy' },
-        { id: 'e4', source: 'story-service', target: 'stripe', relation: 'integrates-with', health: 'healthy' },
+        { id: 'e3', source: 'orders-page', target: 'products', relation: 'reads', health: 'healthy' },
+        { id: 'e4', source: 'catalog-service', target: 'stripe', relation: 'integrates-with', health: 'healthy' },
       ],
     };
 
@@ -33,23 +33,23 @@ describe('projectTopology', () => {
 
     expect(topology.nodes).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'feature:story' }),
-        expect.objectContaining({ id: 'feature:hiring' }),
-        expect.objectContaining({ id: 'stories' }),
+        expect.objectContaining({ id: 'feature:catalog' }),
+        expect.objectContaining({ id: 'feature:orders' }),
+        expect.objectContaining({ id: 'products' }),
         expect.objectContaining({ id: 'stripe' }),
       ]),
     );
     expect(topology.edges).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          source: 'feature:story',
-          target: 'stories',
+          source: 'feature:catalog',
+          target: 'products',
           relation: 'writes',
           health: 'error',
           metadata: expect.objectContaining({ healthMessage: 'Firestore write failed' }),
         }),
-        expect.objectContaining({ source: 'feature:hiring', target: 'stories', relation: 'reads' }),
-        expect.objectContaining({ source: 'feature:story', target: 'stripe' }),
+        expect.objectContaining({ source: 'feature:orders', target: 'products', relation: 'reads' }),
+        expect.objectContaining({ source: 'feature:catalog', target: 'stripe' }),
       ]),
     );
   });

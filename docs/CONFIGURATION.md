@@ -2,7 +2,7 @@
 
 ArchMesh is designed to produce a useful architecture view with no setup. It detects feature areas from common project conventions such as Next.js App Router segments and `features/`, `modules/`, or `domains/` directories.
 
-Detection is intentionally conservative. A codebase's folder structure is not always the same thing as its product architecture, so ArchMesh also supports explicit project semantics.
+Detection is intentionally conservative. Folder structure is not always the same thing as product architecture, so ArchMesh also supports explicit project semantics.
 
 ## Configuration locations
 
@@ -23,28 +23,28 @@ A feature mapping teaches ArchMesh which source paths belong to a human-recogniz
 {
   "features": [
     {
-      "id": "story",
-      "label": "Vetttd Story",
+      "id": "catalog",
+      "label": "Catalog",
       "paths": [
-        "src/app/story/**",
-        "src/features/story/**",
-        "src/components/story/**"
+        "src/app/catalog/**",
+        "src/features/catalog/**",
+        "src/components/catalog/**"
       ]
     },
     {
-      "id": "hiring",
-      "label": "Vetttd Hiring",
+      "id": "orders",
+      "label": "Orders",
       "paths": [
-        "src/app/hiring/**",
-        "src/features/hiring/**"
+        "src/app/orders/**",
+        "src/features/orders/**"
       ]
     },
     {
-      "id": "campus",
-      "label": "Vetttd Campus",
+      "id": "accounts",
+      "label": "Accounts",
       "paths": [
-        "src/app/campus/**",
-        "src/features/campus/**"
+        "src/app/accounts/**",
+        "src/features/accounts/**"
       ]
     }
   ]
@@ -79,11 +79,11 @@ This distinction is deliberate. ArchMesh should never present an inferred produc
 
 Configuration should describe stable product or system meaning, not patch every scanner limitation.
 
-Good mappings:
+Good mappings include:
 
-- Story
-- Hiring
-- Campus
+- Catalog
+- Orders
+- Accounts
 - Billing
 - Identity
 - Admin
@@ -93,4 +93,4 @@ Avoid creating a feature entry for every directory or implementation detail. The
 
 ## Privacy
 
-Configuration stays inside the project being scanned. ArchMesh reads it locally and embeds only the resulting semantic metadata in the locally generated `public/archmesh.json` used by the viewer.
+Configuration stays inside the project being scanned. ArchMesh reads it locally and embeds only the resulting semantic metadata in the locally generated graph used by the viewer.

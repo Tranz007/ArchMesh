@@ -41,3 +41,17 @@ Reason: this keeps ArchMesh usable beyond the first project and prevents framewo
 ArchMesh will integrate `Tranz007/ux-skills` through project context, `AGENTS.md`, documentation, and an install helper rather than copying the entire skills suite into this repository.
 
 Reason: avoid maintaining divergent copies while ensuring agents working on ArchMesh follow the same UX guardrails.
+
+## 2026-08-27 — Public repository examples are project-neutral
+
+README examples, configuration samples, demo graph data, tests, fixtures, and documentation must use generic fictional product names and data. Internal/private project names and structures do not belong in the public ArchMesh repository.
+
+Reason: the public repo should be safe to inspect, fork, teach from, and contribute to without disclosing unrelated private product context.
+
+## 2026-08-27 — v0.1 has a bounded release definition
+
+ArchMesh v0.1 is considered done when it is a trustworthy, installable, local developer tool that completes the core Architecture, Topology, Changes, Drift, Code, and Health workflows for the documented TypeScript/JavaScript baseline.
+
+Cloud collaboration, production telemetry backends, LLM chat, MCP, cross-repository architecture, desktop packaging, and broad language support are explicitly post-v0.1 unless user evidence shows they are required for the core promise.
+
+Reason: prevent an expanding roadmap from delaying a coherent first release indefinitely. The detailed release gates live in `docs/DEFINITION_OF_DONE.md`.

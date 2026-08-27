@@ -42,7 +42,7 @@ For App Router pages and route handlers, ArchMesh stores metadata such as:
 
 ```text
 framework = nextjs
-routePath = /hiring/candidates/[id]
+routePath = /orders/[id]
 routeType = page | api
 httpMethods = GET, POST
 serverActionCount = 1
@@ -53,8 +53,6 @@ Route groups such as `(main)` and parallel-route segments beginning with `@` are
 ## TypeScript path aliases
 
 When a `tsconfig.json` or `jsconfig.json` exists, ArchMesh uses TypeScript's own module resolver rather than reimplementing alias rules.
-
-For example:
 
 ```json
 {
@@ -99,20 +97,20 @@ An external package should not automatically become a first-class architecture n
 Given a detected API route:
 
 ```text
-src/app/api/story/publish/route.ts
-→ /api/story/publish
+src/app/api/catalog/publish/route.ts
+→ /api/catalog/publish
 ```
 
 and a static call:
 
 ```ts
-fetch('/api/story/publish', { method: 'POST' })
+fetch('/api/catalog/publish', { method: 'POST' })
 ```
 
 ArchMesh creates a directed `calls` edge from the calling source file to the API route and labels it:
 
 ```text
-POST /api/story/publish
+POST /api/catalog/publish
 ```
 
 Current HTTP detection intentionally requires a statically readable URL. Dynamic template strings and URLs assembled at runtime are not guessed.
@@ -121,18 +119,16 @@ Current HTTP detection intentionally requires a statically readable URL. Dynamic
 
 When a file imports Firestore and uses supported operations against a statically named collection, ArchMesh creates a data-resource node.
 
-Example:
-
 ```ts
-getDocs(collection(db, 'stories'))
-setDoc(doc(db, 'stories', id), value)
+getDocs(collection(db, 'products'))
+setDoc(doc(db, 'products', id), value)
 ```
 
 produces:
 
 ```text
-story service ──reads──► stories
-story service ──writes─► stories
+catalog service ──reads──► products
+catalog service ──writes─► products
 ```
 
 Supported first-pass operations:

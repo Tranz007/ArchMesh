@@ -1,10 +1,10 @@
 # AGENTS.md
 
-ArchMesh is a local-first visual architecture explorer. It turns source code and runtime health signals into a living graph that helps people understand how a system is connected, what changed, what failed, and what may be affected.
+ArchMesh is a local-first visual architecture explorer. It turns source code, source-control changes, architecture drift, and runtime health signals into a living graph that helps people understand how a system is connected, what changed, what failed, and what may be affected.
 
 ## Product intent
 
-ArchMesh is not primarily a code search tool, static diagram generator, generic observability dashboard, or AI chat wrapper. Its core value is a trustworthy visual model of software architecture that can move from ecosystem → product → feature → route/service/component → file/function/data/integration and can show health directly on the relationships.
+ArchMesh is not primarily a code search tool, static diagram generator, generic observability dashboard, or AI chat wrapper. Its core value is a trustworthy visual model of software architecture that can move from ecosystem → product → feature → route/service/component → file/data/integration and can show evidence directly on relationships.
 
 The central interaction should remain understandable to a technical product/design/architecture practitioner, not only to compiler or graph specialists.
 
@@ -19,6 +19,7 @@ Read these documents before substantive work:
 - `docs/SCANNER.md`
 - `docs/HEALTH_AND_OBSERVABILITY.md`
 - `docs/DEVELOPMENT.md`
+- `docs/DEFINITION_OF_DONE.md`
 - `docs/ROADMAP.md`
 - `.ux/CONTEXT.md`
 - `.ux/DESIGN-SYSTEM.md`
@@ -31,9 +32,11 @@ Read these documents before substantive work:
 3. **Progressive detail.** Prefer semantic architecture at first glance; allow users to move deeper into technical detail when needed.
 4. **Trustworthy relationships.** Never invent a dependency, failure, data flow, affected path, or architectural meaning. Distinguish detected, inferred, configured, and unknown information when it matters.
 5. **Failure is a path, not a decoration.** Direct failures and downstream impact are different states and must remain visually distinct.
-6. **Do not drown the user in the graph.** Large graphs require filtering, clustering, search, semantic grouping, and progressive disclosure.
-7. **Framework knowledge belongs in adapters.** Keep the core graph model generic; Next.js, Firebase, Stripe, React, and other semantics should be layered on through scanners/adapters.
-8. **The graph schema is a contract.** New node, edge, and health concepts should be documented and tested before they proliferate.
+6. **Change is not failure.** Git `changed` / `affected`, runtime `error` / `impacted`, and structural drift are independent dimensions.
+7. **Do not drown the user in the graph.** Large graphs require filtering, clustering, search, semantic grouping, and progressive disclosure.
+8. **Framework knowledge belongs in adapters.** Keep the core graph model generic; Next.js, Firebase, Stripe, React, and other semantics should be layered on through scanners/adapters.
+9. **The graph schema is a contract.** New node, edge, health, change, and drift concepts should be documented and tested before they proliferate.
+10. **The public repo is project-neutral.** Do not place private/internal product names, paths, data, screenshots, fixtures, or examples in public source, tests, docs, or demo data.
 
 ## UX Skills contract
 
@@ -53,12 +56,12 @@ For product/UI work, consider the UX Skills capabilities for accessibility, blin
 ## Visual and interaction rules
 
 - The graph is the primary canvas; controls should support it rather than compete with it.
-- Use color semantically and sparingly. Health colors must remain consistent across graph, inspector, filters, and any future timeline.
-- Do not encode health by color alone; provide labels, icons, line treatment, or inspector text where appropriate.
+- Use color semantically and sparingly.
+- Do not encode health/change/drift by color alone; provide labels, icons, line treatment, or inspector text where appropriate.
 - Direct `error` and downstream `impacted` states must never be visually indistinguishable.
 - Clicking a node should make its immediate context easier to understand, not trigger a disorienting relayout.
 - Search should navigate the architecture, not act like a generic repository grep UI.
-- “Errors only” should preserve enough context to understand the failing path.
+- “Errors only” and other focused views should preserve enough context to understand the path.
 - Dense graphs must degrade gracefully on smaller screens and remain keyboard-accessible where practical.
 
 ## Engineering rules
@@ -69,12 +72,12 @@ For product/UI work, consider the UX Skills capabilities for accessibility, blin
 - Do not make the core viewer depend on an LLM, embeddings, vector database, cloud service, or telemetry vendor.
 - Adapters may enrich the graph, but raw source scanning must remain useful without them.
 - Runtime health ingestion must map evidence onto known graph IDs; it must not fabricate relationships to make an error trace look complete.
-- Preserve deterministic IDs for the same architectural entities whenever possible so future health/history data can attach reliably.
-- Keep generated scan output out of source control except deliberate fixtures.
+- Preserve deterministic IDs for the same architectural entities whenever possible so health/history/change/drift data can attach reliably.
+- Keep generated scan output out of source control except deliberate fictional fixtures.
 
-## Health semantics
+## State semantics
 
-Use the shared health states consistently:
+### Health
 
 - `healthy` — no known failure on this entity/relationship.
 - `warning` — degraded, suspicious, or partially unhealthy.
@@ -83,6 +86,22 @@ Use the shared health states consistently:
 - `unknown` — insufficient evidence to establish health.
 
 Never promote `impacted` to `error` without direct evidence.
+
+### Git change impact
+
+- `changed` — source changed directly in the selected comparison.
+- `affected` — a reverse dependent of changed source.
+
+Do not imply that either state is a runtime problem.
+
+### Architecture drift
+
+- `added` — structural entity/relationship exists now but not in the previous scan.
+- `removed` — existed previously and is retained only as historical context.
+- `modified` — stable identity remains but structural metadata changed.
+- `stable` — unchanged context retained to explain drift.
+
+Do not derive drift from health or Git overlays alone.
 
 ## Scanner discipline
 
@@ -93,7 +112,7 @@ When adding framework semantics:
 1. Define the input pattern.
 2. Define the node/edge output.
 3. State whether the relationship is detected or inferred.
-4. Add a fixture/test.
+4. Add a fictional fixture/test.
 5. Document limitations and false-positive risks.
 
 ## Documentation discipline
@@ -101,6 +120,12 @@ When adding framework semantics:
 Documentation changes are part of feature completion. If a change alters behavior, graph schema, scanner semantics, CLI usage, health semantics, architecture, or contributor workflow, update the relevant document in the same change.
 
 Record consequential architectural/product decisions in `.ux/DECISIONS.md` rather than allowing rationale to disappear into chat or commit history.
+
+## Definition of Done
+
+`docs/DEFINITION_OF_DONE.md` is the project release contract. Use it when deciding whether a change is complete and whether work is required for v0.1 or belongs in a later release.
+
+Do not keep expanding v0.1 merely because another capability would be interesting. If an unmet release gate cannot be named, the proposed work does not block v0.1.
 
 ## Before finishing a change
 
@@ -112,14 +137,13 @@ npm test
 npm run build
 ```
 
-For visual changes, also run ArchMesh against a representative repository and inspect:
+Also confirm:
 
-- an ordinary architecture view;
-- selected-node context;
-- search/navigation;
-- errors-only state;
-- a direct error path;
-- downstream impacted paths;
-- narrow viewport behavior.
+- ArchMesh self-scan succeeds;
+- public examples/tests contain no private project information;
+- relevant docs and roadmap status are current;
+- direct evidence and inferred states remain semantically distinct.
+
+For visual changes, inspect an ordinary architecture view, selected-node context, search/navigation, relevant focused/error/change/drift states, and narrow viewport behavior.
 
 Do not claim a check passed unless it was actually run.

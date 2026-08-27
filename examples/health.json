@@ -1,13 +1,13 @@
 {
   "signals": [
     {
-      "id": "runtime-story-publish-500",
+      "id": "runtime-checkout-submit-500",
       "severity": "error",
       "source": "runtime",
-      "message": "POST /api/story/publish returned 500",
+      "message": "POST /api/checkout/submit returned 500",
       "edge": {
-        "source": { "path": "src/app/story/page.tsx" },
-        "target": { "path": "src/app/api/story/publish/route.ts" }
+        "source": { "path": "src/app/checkout/page.tsx" },
+        "target": { "path": "src/app/api/checkout/submit/route.ts" }
       }
     },
     {
