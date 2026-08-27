@@ -26,7 +26,7 @@ async function fixture(files: Record<string, string>) {
 describe('scanProject', () => {
   it('maps relative imports and known integrations', async () => {
     const root = await fixture({
-      'src/app/page.tsx': `import { Card } from '../../components/Card';\nimport Stripe from 'stripe';\nexport default function Page(){ return <Card /> }`,
+      'src/app/page.tsx': `import { Card } from '../components/Card';\nimport Stripe from 'stripe';\nexport default function Page(){ return <Card /> }`,
       'src/components/Card.tsx': `export function Card(){ return <div>Card</div> }`,
     });
 
