@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
 import type { ArchEdge, ArchGraphData, ArchNode, NodeKind } from '../types.js';
+import { configuredFeatureForPath, loadArchMeshConfig } from './config.js';
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 const IGNORED_DIRS = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'coverage', '.turbo']);
@@ -149,6 +150,7 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
   const root = path.resolve(rootInput);
   const projectName = path.basename(root);
   const compilerOptions = loadCompilerOptions(root);
+  const archMeshConfig = await loadArchMeshConfig(root);
   const files: string[] = [];
   await walk(root, files);
 
@@ -159,12 +161,20 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
   for (const absolute of files) {
     const relative = toPosix(path.relative(root, absolute));
     const id = nodeIdForFile(relative);
+    const configuredFeature = configuredFeatureForPath(relative, archMeshConfig);
     nodes.set(id, {
       id,
       label: path.basename(relative),
       kind: classifyFile(relative),
       path: relative,
       health: 'healthy',
+      metadata: configuredFeature
+        ? {
+            featureKey: configuredFeature.key,
+            featureLabel: configuredFeature.label ?? null,
+            featureSource: 'config',
+          }
+        : undefined,
     });
   }
 
