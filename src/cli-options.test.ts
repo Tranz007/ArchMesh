@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { parseCliOptions } from './cli-options';
 
 describe('parseCliOptions', () => {
-  it('parses target, health file, diagnostics, working-tree changes, and watch mode', () => {
+  it('parses target, health file, diagnostics, working-tree changes, watch mode, and editor', () => {
     const result = parseCliOptions(
-      ['../project', '--health', './signals.json', '--diagnostics', '--changes', '--watch'],
+      ['../project', '--health', './signals.json', '--diagnostics', '--changes', '--watch', '--editor', 'cursor'],
       '/workspace/archmesh',
     );
 
@@ -15,6 +15,7 @@ describe('parseCliOptions', () => {
       changes: true,
       changesFrom: undefined,
       watch: true,
+      editor: 'cursor',
     });
   });
 
@@ -26,10 +27,11 @@ describe('parseCliOptions', () => {
       changes: false,
       changesFrom: 'main',
       watch: false,
+      editor: 'auto',
     });
   });
 
-  it('defaults to the current directory', () => {
+  it('defaults to the current directory and auto editor selection', () => {
     expect(parseCliOptions([], '/workspace/project')).toEqual({
       target: '/workspace/project',
       healthPath: undefined,
@@ -37,7 +39,13 @@ describe('parseCliOptions', () => {
       changes: false,
       changesFrom: undefined,
       watch: false,
+      editor: 'auto',
     });
+  });
+
+  it('rejects unsupported editor names', () => {
+    expect(() => parseCliOptions(['--editor', 'vim'], '/workspace/project'))
+      .toThrow('Unsupported editor: vim.');
   });
 
   it('does not allow two Git change scopes at once', () => {
