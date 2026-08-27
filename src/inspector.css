@@ -61,7 +61,18 @@
 .health-evidence dt { color: #77859c; font-size: 10px; text-transform: uppercase; }
 .health-evidence dd { margin: 0; color: #9ba8bc; font-size: 10px; overflow-wrap: anywhere; }
 
-.impact-note {
+.change-badge {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+.change-badge.changed { color: #8cc8ff; background: rgba(88, 166, 255, .1); }
+.change-badge.affected { color: #c6b5ff; background: rgba(167, 139, 250, .1); }
+
+.impact-note,
+.change-note {
   margin: 14px 0 0;
   padding: 10px 11px;
   border-left: 3px solid #ff8f70;
@@ -70,6 +81,15 @@
   color: #aeb7c7;
   font-size: 11px;
   line-height: 1.55;
+}
+
+.change-note {
+  border-left-color: #a78bfa;
+  background: rgba(167, 139, 250, .07);
+}
+.change-note.changed {
+  border-left-color: #58a6ff;
+  background: rgba(88, 166, 255, .07);
 }
 
 .edge-route {
