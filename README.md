@@ -44,7 +44,9 @@ ArchMesh is pre-1.0, but already supports a useful TypeScript/JavaScript baselin
 - TypeScript diagnostics and generic health-signal ingestion;
 - Git working-tree and base-ref change impact;
 - live watch mode with browser refresh without a full page reload;
-- architecture drift comparison between consecutive successful live scans.
+- architecture drift comparison between consecutive successful live scans;
+- a compiled/packageable `archmesh` CLI with clean packed-install smoke testing;
+- source-backed graph nodes can open directly in Cursor, VS Code, or Zed through the local launcher.
 
 ## Health is part of the graph
 
@@ -78,7 +80,7 @@ A red connection is selectable. When evidence exists, the inspector explains why
 Health, source-control impact, and architecture drift are deliberately independent dimensions:
 
 ```text
-Runtime health       Git impact        Architecture drift
+Runtime health       Git impact         Architecture drift
 error / impacted     changed / affected added / removed / modified
 ```
 
@@ -92,6 +94,12 @@ A changed file is not automatically broken. An affected feature is not automatic
 - npm
 - a modern browser with WebGL support
 
+### Package status
+
+ArchMesh now builds a real npm-style package with an `archmesh` executable. CI creates a tarball, installs it into a clean temporary npm project, and runs the installed compiled CLI as a consumer smoke test.
+
+The public npm registry package has **not been claimed as released yet**, so the documented source checkout remains the supported public installation path until the release/package identity is finalized.
+
 ```bash
 git clone https://github.com/Tranz007/ArchMesh.git
 cd ArchMesh
@@ -99,9 +107,15 @@ npm install
 npm run atlas -- /absolute/path/to/your/project
 ```
 
-ArchMesh scans the target, writes a gitignored local graph, starts the viewer on port `4242`, and opens the browser.
+The packaged executable uses the same syntax:
 
-If no target is provided, ArchMesh scans itself:
+```bash
+archmesh /absolute/path/to/your/project
+```
+
+ArchMesh scans the target, creates an isolated OS-temporary runtime workspace, starts the viewer on port `4242`, and opens the browser. The runtime graph/drift artifacts are removed when the launcher shuts down normally.
+
+If no target is provided during source development, ArchMesh scans itself:
 
 ```bash
 npm run atlas
@@ -109,20 +123,41 @@ npm run atlas
 
 ### Keep the map live
 
+Source checkout:
+
 ```bash
 npm run atlas -- /absolute/path/to/project --watch
 ```
 
-Watch mode debounces filesystem events, serializes rebuilds, refreshes the graph in the browser without a page reload, and compares each successful scan with the previous one for structural drift.
+Packaged command:
 
-Local generated artifacts:
-
-```text
-public/archmesh.json
-public/archmesh-drift.json
+```bash
+archmesh /absolute/path/to/project --watch
 ```
 
-Current watch mode performs a full scan on each debounced rebuild. Incremental invalidation is a planned performance improvement.
+Watch mode debounces filesystem events, serializes rebuilds, refreshes the graph in the browser without a page reload, and compares each successful scan with the previous one for structural drift.
+
+Current watch mode performs a full scan on each debounced rebuild. Incremental invalidation is a performance optimization to be driven by representative repository benchmarks rather than assumed necessary in advance.
+
+### Open a graph entity in your editor
+
+Select a source-backed node and use **Open in editor** beneath its path in the inspector.
+
+The default editor preference is `auto`. You can make it explicit:
+
+```bash
+npm run atlas -- /absolute/path/to/project --editor cursor
+npm run atlas -- /absolute/path/to/project --editor code
+npm run atlas -- /absolute/path/to/project --editor zed
+```
+
+The packaged command uses the same option:
+
+```bash
+archmesh . --editor cursor
+```
+
+ArchMesh validates that the requested source path resolves inside the scanned project before invoking a local editor CLI. Absolute machine paths are not embedded in the graph JSON.
 
 ### Visualize Git change impact
 
@@ -180,6 +215,16 @@ Example:
 ```
 
 See [`docs/HEALTH_AND_OBSERVABILITY.md`](docs/HEALTH_AND_OBSERVABILITY.md).
+
+### Scan without launching the viewer
+
+The development-only scan command still writes a gitignored snapshot into the ArchMesh checkout for inspection/testing:
+
+```bash
+npm run scan -- /absolute/path/to/project
+```
+
+That output is not the packaged launcher's runtime storage model.
 
 ## Teach ArchMesh your product language
 
@@ -269,6 +314,7 @@ src/
 ├── health/        health signals and propagation
 ├── changes/       Git change-impact analysis
 ├── drift/         graph-to-graph structural comparison
+├── editor/        safe local source-editor navigation
 ├── build-graph    shared graph-build pipeline
 ├── watch          live filesystem rebuild pipeline
 ├── GraphCanvas    Sigma.js rendering
@@ -301,7 +347,7 @@ npm run scan
 npm run dev
 ```
 
-CI validates dependency installation, TypeScript typechecking, tests, production build, and an ArchMesh self-scan on a clean runner.
+CI validates dependency installation, TypeScript typechecking, tests, production build, compiled CLI help, package contents, a clean packed-install consumer smoke test, and an ArchMesh self-scan.
 
 ArchMesh also includes [`AGENTS.md`](AGENTS.md) plus committed `.ux/` project context. The canonical [UX Skills](https://github.com/Tranz007/ux-skills) suite can be installed with:
 
@@ -317,17 +363,16 @@ The short version: a feature is not done because code exists, and v0.1 is not do
 
 ## Roadmap
 
-Near-term work is focused on release usefulness rather than adding unrelated surfaces:
+The remaining v0.1 work is release-gate driven:
 
-1. finish and validate architecture drift;
-2. incremental scanning and graph deltas for watch mode;
-3. source-editor navigation from graph entities;
-4. packaging toward a one-command `npx archmesh .` experience;
-5. larger-repository performance and progressive detail;
-6. richer platform semantics and local test/build/runtime health adapters;
-7. persisted snapshots and change-to-failure history.
+1. representative end-to-end fixture and consumer smoke path;
+2. cross-platform CI/support validation;
+3. measured scan/watch performance and incremental invalidation only where needed;
+4. progressive detail and layout stability on larger repositories;
+5. accessibility and primary empty/error-state validation;
+6. finalize registry/package identity and publish a green v0.1 release.
 
-See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) and [`docs/DEFINITION_OF_DONE.md`](docs/DEFINITION_OF_DONE.md).
 
 ## What ArchMesh is not
 

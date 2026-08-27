@@ -1,0 +1,45 @@
+.source-open-action {
+  margin-top: 10px;
+  display: grid;
+  gap: 7px;
+}
+
+.source-open-action button {
+  min-height: 34px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #34435e;
+  border-radius: 8px;
+  background: #131c2b;
+  color: #cbd5e4;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.source-open-action button:hover:not(:disabled) {
+  border-color: #58709a;
+  background: #182438;
+  color: #f0f4fa;
+}
+
+.source-open-action button:focus-visible {
+  outline: 2px solid #7ca9eb;
+  outline-offset: 2px;
+}
+
+.source-open-action button:disabled {
+  cursor: progress;
+  opacity: .7;
+}
+
+.source-open-message {
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.source-open-message.success { color: #76d2a6; }
+.source-open-message.error { color: #ff8d97; }

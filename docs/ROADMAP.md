@@ -34,11 +34,11 @@ Delivered:
 - Architecture view and feature drill-down;
 - richer directional inspector;
 - explicit provenance for configured versus detected feature semantics;
-- feature/product change-state aggregation from exact source impact.
+- feature/product change-state aggregation from exact source impact;
+- source-editor navigation from scanned source nodes through the local launcher.
 
 Remaining before or near v0.1:
 
-- source-editor navigation;
 - workspace/package resolution where needed for common monorepos;
 - large-repository progressive detail;
 - measured layout stability/performance improvements.
@@ -148,32 +148,45 @@ Later:
 
 ## Slice 7 — Portable developer tool
 
-Status: **required for v0.1**
+Status: **package foundation delivered; release identity pending**
 
-Goals:
+Delivered:
 
-- package/CLI experience approaching `npx archmesh .`;
-- ordinary use without cloning the ArchMesh repository;
-- clear first-run failures and help output;
-- documented package/versioning flow;
-- clean-install smoke test;
-- supported Node-version policy;
+- compiled Node CLI exposed as `archmesh`;
+- `--help` and `--version`;
+- source checkout and packaged CLI share the same option model;
+- package contents/publish configuration;
+- isolated OS-temporary runtime graph storage for installed use;
+- package dry-run validation;
+- tarball install into a clean temporary consumer project;
+- installed compiled CLI smoke test.
+
+Remaining for v0.1:
+
+- finalize registry/package identity;
+- publish the package;
+- verify clean install from the actual registry package;
+- supported Node-version policy beyond the current baseline;
 - operating-system compatibility checks;
-- public sample/fixture repository for end-to-end validation.
+- public representative fixture/end-to-end validation.
 
 ## Slice 8 — Release usability and scale
 
 Status: **required for v0.1**
 
-Goals:
+Delivered:
 
 - source-editor navigation from scanned entities;
+- explicit Cursor / VS Code / Zed launcher preference with safe local path validation.
+
+Remaining:
+
 - representative small/medium/large repository benchmarks;
 - progressive detail that avoids an unusable default file hairball;
 - stable identity/layout checks across rescans;
 - narrow viewport and accessibility review of all primary views;
 - end-to-end fixture covering Architecture, Topology, Changes, Drift, Code, and Health;
-- README/install docs verified from a clean environment.
+- README/install docs verified from a clean environment and, after publish, the registry package.
 
 ## Post-v0.1 platform work
 
@@ -193,13 +206,12 @@ These are deliberately outside the first release boundary unless user evidence c
 
 ## Near-term v0.1 sequence
 
-1. Package the CLI so ArchMesh can run without cloning this repository.
-2. Add source-editor navigation from the inspector.
-3. Build a representative end-to-end fixture and smoke-test path.
-4. Add cross-platform CI/support validation.
-5. Benchmark scan/watch performance and implement incremental invalidation where measurements require it.
-6. Improve progressive detail/layout stability on larger repositories.
-7. Validate accessibility and all primary empty/error states.
-8. Cut v0.1 when the gates in `DEFINITION_OF_DONE.md` are satisfied.
+1. Build a representative end-to-end fixture and smoke-test path.
+2. Add cross-platform CI/support validation.
+3. Benchmark scan/watch performance and implement incremental invalidation where measurements require it.
+4. Improve progressive detail/layout stability on larger repositories.
+5. Validate accessibility and all primary empty/error states.
+6. Finalize registry/package identity, publish, and verify a clean registry install.
+7. Cut v0.1 when the gates in `DEFINITION_OF_DONE.md` are satisfied.
 
 The release decision should be gate-driven, not roadmap-length-driven.
