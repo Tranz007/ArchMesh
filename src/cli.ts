@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
@@ -51,8 +52,11 @@ if (rawArgs.includes('--version') || rawArgs.includes('-v')) {
 }
 
 const options = parseCliOptions(rawArgs);
-const output = path.join(archMeshRoot, 'public', 'archmesh.json');
-const driftOutput = path.join(archMeshRoot, 'public', 'archmesh-drift.json');
+const runtimeRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'archmesh-'));
+const publicDir = path.join(runtimeRoot, 'public');
+const output = path.join(publicDir, 'archmesh.json');
+const driftOutput = path.join(publicDir, 'archmesh-drift.json');
+await fs.mkdir(publicDir, { recursive: true });
 
 function logResult(result: BuildGraphResult, prefix = 'Mapped') {
   const { graph, changedPaths, signals } = result;
@@ -78,6 +82,7 @@ logResult(initial);
 
 const server = await createServer({
   root: archMeshRoot,
+  publicDir,
   server: {
     port: 4242,
     strictPort: true,
@@ -88,9 +93,11 @@ const server = await createServer({
 await server.listen();
 server.printUrls();
 
+let watcherHandle: ReturnType<typeof watchProject> | undefined;
+
 if (options.watch) {
   console.log('Watching project source for architecture changes.');
-  watchProject(options, {
+  watcherHandle = watchProject(options, {
     onBuild: async (result) => {
       const drift = compareGraphs(previousGraph, result.graph);
       previousGraph = result.graph;
@@ -121,5 +128,18 @@ if (options.watch) {
     },
   });
 }
+
+let shuttingDown = false;
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  watcherHandle?.close();
+  await server.close();
+  await fs.rm(runtimeRoot, { recursive: true, force: true });
+  process.exit(0);
+}
+
+process.once('SIGINT', () => void shutdown());
+process.once('SIGTERM', () => void shutdown());
 
 console.log('Press Ctrl+C to stop ArchMesh.\n');
