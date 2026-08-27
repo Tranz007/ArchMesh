@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { parseCliOptions } from './cli-options';
 
 describe('parseCliOptions', () => {
-  it('parses target, health file, diagnostics, and working-tree changes', () => {
+  it('parses target, health file, diagnostics, working-tree changes, and watch mode', () => {
     const result = parseCliOptions(
-      ['../project', '--health', './signals.json', '--diagnostics', '--changes'],
+      ['../project', '--health', './signals.json', '--diagnostics', '--changes', '--watch'],
       '/workspace/archmesh',
     );
 
@@ -14,6 +14,7 @@ describe('parseCliOptions', () => {
       diagnostics: true,
       changes: true,
       changesFrom: undefined,
+      watch: true,
     });
   });
 
@@ -24,6 +25,7 @@ describe('parseCliOptions', () => {
       diagnostics: false,
       changes: false,
       changesFrom: 'main',
+      watch: false,
     });
   });
 
@@ -34,6 +36,7 @@ describe('parseCliOptions', () => {
       diagnostics: false,
       changes: false,
       changesFrom: undefined,
+      watch: false,
     });
   });
 
