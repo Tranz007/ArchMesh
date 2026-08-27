@@ -78,6 +78,27 @@ function nodeIdForFile(relativePath: string) {
   return `file:${toPosix(relativePath)}`;
 }
 
+function collectImports(sourceFile: ts.SourceFile) {
+  const imports: string[] = [];
+
+  const visit = (node: ts.Node) => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      const moduleSpecifier = node.moduleSpecifier;
+      if (moduleSpecifier && ts.isStringLiteral(moduleSpecifier)) imports.push(moduleSpecifier.text);
+    }
+
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const [argument] = node.arguments;
+      if (argument && ts.isStringLiteral(argument)) imports.push(argument.text);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return [...new Set(imports)];
+}
+
 export async function scanProject(rootInput: string): Promise<ArchGraphData> {
   const root = path.resolve(rootInput);
   const projectName = path.basename(root);
@@ -112,19 +133,7 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
       absolute.endsWith('.tsx') || absolute.endsWith('.jsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
     );
 
-    const imports: string[] = [];
-    sourceFile.forEachChild((node) => {
-      if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
-        const moduleSpecifier = node.moduleSpecifier;
-        if (moduleSpecifier && ts.isStringLiteral(moduleSpecifier)) imports.push(moduleSpecifier.text);
-      }
-      if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-        const [argument] = node.arguments;
-        if (argument && ts.isStringLiteral(argument)) imports.push(argument.text);
-      }
-    });
-
-    for (const specifier of imports) {
+    for (const specifier of collectImports(sourceFile)) {
       let targetId: string | undefined;
       if (specifier.startsWith('.')) {
         const targetPath = await resolveRelativeImport(absolute, specifier, root);
