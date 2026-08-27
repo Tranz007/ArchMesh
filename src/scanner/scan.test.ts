@@ -37,6 +37,7 @@ describe('scanProject', () => {
     const stripe = graph.nodes.find((node) => node.id === 'integration:stripe');
 
     expect(page?.kind).toBe('route');
+    expect(page?.metadata?.routePath).toBe('/');
     expect(card?.kind).toBe('component');
     expect(stripe?.kind).toBe('integration');
     expect(graph.edges).toEqual(
@@ -72,6 +73,47 @@ describe('scanProject', () => {
     );
   });
 
+  it('detects Next.js page and API route semantics', async () => {
+    const root = await fixture({
+      'src/app/(main)/hiring/candidates/[id]/page.tsx': `export default function Candidate(){ return null }`,
+      'src/app/api/hiring/candidates/[id]/route.ts': `export async function GET(){ return new Response('ok') }\nexport const POST = async () => new Response('created')`,
+    });
+
+    const graph = await scanProject(root);
+    const page = graph.nodes.find((node) => node.path?.endsWith('/page.tsx'));
+    const api = graph.nodes.find((node) => node.path?.endsWith('/route.ts'));
+
+    expect(page?.metadata).toMatchObject({
+      framework: 'nextjs',
+      routePath: '/hiring/candidates/[id]',
+      routeType: 'page',
+    });
+    expect(api?.metadata).toMatchObject({
+      framework: 'nextjs',
+      routePath: '/api/hiring/candidates/[id]',
+      routeType: 'api',
+      httpMethods: 'GET, POST',
+    });
+  });
+
+  it('marks configured product semantics on scanned nodes', async () => {
+    const root = await fixture({
+      'archmesh.config.json': JSON.stringify({
+        features: [{ id: 'story', label: 'Vetttd Story', paths: ['src/app/profile/**'] }],
+      }),
+      'src/app/profile/page.tsx': `export default function Profile(){ return null }`,
+    });
+
+    const graph = await scanProject(root);
+    const profile = graph.nodes.find((node) => node.path === 'src/app/profile/page.tsx');
+
+    expect(profile?.metadata).toMatchObject({
+      featureKey: 'story',
+      featureLabel: 'Vetttd Story',
+      featureSource: 'config',
+    });
+  });
+
   it('detects dynamic imports nested inside code', async () => {
     const root = await fixture({
       'src/load.ts': `export async function load(){ return import('./feature') }`,
@@ -87,6 +129,20 @@ describe('scanProject', () => {
         expect.objectContaining({ source: source?.id, target: target?.id, relation: 'imports' }),
       ]),
     );
+  });
+
+  it('detects server action directives', async () => {
+    const root = await fixture({
+      'src/app/story/actions.ts': `'use server';\nexport async function publish(){ return true }`,
+      'src/app/hiring/actions.ts': `export async function save(){ 'use server'; return true }`,
+    });
+
+    const graph = await scanProject(root);
+    const story = graph.nodes.find((node) => node.path === 'src/app/story/actions.ts');
+    const hiring = graph.nodes.find((node) => node.path === 'src/app/hiring/actions.ts');
+
+    expect(story?.metadata?.serverActionCount).toBe(1);
+    expect(hiring?.metadata?.serverActionCount).toBe(1);
   });
 
   it('ignores generated and dependency directories', async () => {
