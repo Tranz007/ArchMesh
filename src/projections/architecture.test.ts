@@ -57,4 +57,33 @@ describe('projectArchitecture', () => {
     expect(projection.nodes.some((node) => node.id === 'feature:hiring')).toBe(true);
     expect(projection.nodes.some((node) => node.id === 'stripe')).toBe(true);
   });
+
+  it('uses configured feature identity and label before path inference', () => {
+    const configuredGraph: ArchGraphData = {
+      project: 'Vetttd',
+      generatedAt: graph.generatedAt,
+      nodes: [
+        {
+          id: 'profile',
+          label: 'page.tsx',
+          kind: 'route',
+          path: 'src/app/profile/page.tsx',
+          health: 'healthy',
+          metadata: {
+            featureKey: 'story',
+            featureLabel: 'Vetttd Story',
+            featureSource: 'config',
+          },
+        },
+      ],
+      edges: [],
+    };
+
+    const projection = projectArchitecture(configuredGraph).graph;
+    const story = projection.nodes.find((node) => node.id === 'feature:story');
+
+    expect(story?.label).toBe('Vetttd Story');
+    expect(story?.metadata?.semanticSource).toBe('config');
+    expect(projection.nodes.some((node) => node.id === 'feature:profile')).toBe(false);
+  });
 });
