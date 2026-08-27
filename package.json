@@ -28,6 +28,7 @@
     "scan": "tsx src/scanner/cli.ts",
     "atlas": "tsx src/cli.ts",
     "pack:check": "npm pack --dry-run",
+    "smoke:package": "node scripts/smoke-package.mjs",
     "ux:install": "npx skills add Tranz007/ux-skills --all",
     "test": "vitest run",
     "typecheck": "tsc -b --pretty false"
