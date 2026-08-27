@@ -6,6 +6,7 @@ import { configuredFeatureForPath, loadArchMeshConfig } from './config.js';
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 const IGNORED_DIRS = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'coverage', '.turbo']);
+const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']);
 
 const integrationMatchers: Array<[RegExp, string]> = [
   [/^(firebase|firebase-admin)(\/|$)/, 'Firebase'],
@@ -28,6 +29,67 @@ function classifyFile(relativePath: string): NodeKind {
   if (/(service|client|repository|store|provider|adapter)s?\//i.test(normalized) || /(service|client|repository|adapter)\.[jt]s$/i.test(normalized)) return 'service';
   if (/(schema|model|types?)\//i.test(normalized)) return 'data';
   return 'file';
+}
+
+function appRoutePath(relativePath: string, kind: NodeKind) {
+  if (kind !== 'route' && kind !== 'api') return undefined;
+  const parts = toPosix(relativePath).split('/').filter(Boolean);
+  const appIndex = parts.indexOf('app');
+  if (appIndex < 0) return undefined;
+
+  const routeParts = parts.slice(appIndex + 1, -1).filter((segment) => {
+    if (segment.startsWith('(') && segment.endsWith(')')) return false;
+    if (segment.startsWith('@')) return false;
+    return true;
+  });
+
+  const route = `/${routeParts.join('/')}`.replace(/\/+/g, '/');
+  return route === '' ? '/' : route;
+}
+
+function isExported(node: ts.Node) {
+  return Boolean(ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
+}
+
+function exportedHttpMethods(sourceFile: ts.SourceFile) {
+  const methods = new Set<string>();
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isFunctionDeclaration(statement) && isExported(statement) && statement.name) {
+      if (HTTP_METHODS.has(statement.name.text)) methods.add(statement.name.text);
+    }
+    if (ts.isVariableStatement(statement) && isExported(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name) && HTTP_METHODS.has(declaration.name.text)) {
+          methods.add(declaration.name.text);
+        }
+      }
+    }
+  }
+
+  return [...methods].sort();
+}
+
+function hasDirective(statements: ts.NodeArray<ts.Statement>, directive: string) {
+  return statements.some(
+    (statement) => ts.isExpressionStatement(statement)
+      && ts.isStringLiteral(statement.expression)
+      && statement.expression.text === directive,
+  );
+}
+
+function serverActionCount(sourceFile: ts.SourceFile) {
+  let count = hasDirective(sourceFile.statements, 'use server') ? 1 : 0;
+
+  const visit = (node: ts.Node) => {
+    if (ts.isFunctionLike(node) && node.body && ts.isBlock(node.body)) {
+      if (hasDirective(node.body.statements, 'use server')) count += 1;
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  ts.forEachChild(sourceFile, visit);
+  return count;
 }
 
 async function walk(dir: string, files: string[]) {
@@ -162,19 +224,30 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
     const relative = toPosix(path.relative(root, absolute));
     const id = nodeIdForFile(relative);
     const configuredFeature = configuredFeatureForPath(relative, archMeshConfig);
+    const kind = classifyFile(relative);
+    const routePath = appRoutePath(relative, kind);
     nodes.set(id, {
       id,
       label: path.basename(relative),
-      kind: classifyFile(relative),
+      kind,
       path: relative,
       health: 'healthy',
-      metadata: configuredFeature
-        ? {
-            featureKey: configuredFeature.key,
-            featureLabel: configuredFeature.label ?? null,
-            featureSource: 'config',
-          }
-        : undefined,
+      metadata: {
+        ...(configuredFeature
+          ? {
+              featureKey: configuredFeature.key,
+              featureLabel: configuredFeature.label ?? null,
+              featureSource: 'config',
+            }
+          : {}),
+        ...(routePath
+          ? {
+              framework: 'nextjs',
+              routePath,
+              routeType: kind === 'api' ? 'api' : 'page',
+            }
+          : {}),
+      },
     });
   }
 
@@ -189,6 +262,19 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
       true,
       scriptKindFor(absolute),
     );
+    const node = nodes.get(sourceId);
+
+    if (node) {
+      const methods = node.kind === 'api' ? exportedHttpMethods(sourceFile) : [];
+      const actions = serverActionCount(sourceFile);
+      if (methods.length > 0 || actions > 0) {
+        node.metadata = {
+          ...(node.metadata ?? {}),
+          ...(methods.length > 0 ? { httpMethods: methods.join(', ') } : {}),
+          ...(actions > 0 ? { serverActionCount: actions } : {}),
+        };
+      }
+    }
 
     for (const specifier of collectImports(sourceFile)) {
       let targetId: string | undefined;
