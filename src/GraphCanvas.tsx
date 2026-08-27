@@ -181,6 +181,8 @@ export function GraphCanvas({
     const renderer = new Sigma(graph, containerRef.current, {
       renderEdgeLabels: false,
       labelRenderedSizeThreshold: 7,
+      labelColor: { color: '#dbe6f8' },
+      labelWeight: '500',
       minCameraRatio: 0.08,
       maxCameraRatio: 8,
       nodeReducer(node, attributes) {
