@@ -47,6 +47,23 @@ describe('scanProject', () => {
     );
   });
 
+  it('detects dynamic imports nested inside code', async () => {
+    const root = await fixture({
+      'src/load.ts': `export async function load(){ return import('./feature') }`,
+      'src/feature.ts': `export const feature = true`,
+    });
+
+    const graph = await scanProject(root);
+    const source = graph.nodes.find((node) => node.path === 'src/load.ts');
+    const target = graph.nodes.find((node) => node.path === 'src/feature.ts');
+
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: source?.id, target: target?.id, relation: 'imports' }),
+      ]),
+    );
+  });
+
   it('ignores generated and dependency directories', async () => {
     const root = await fixture({
       'src/index.ts': `export const value = 1`,
