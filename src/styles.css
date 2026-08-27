@@ -15,7 +15,7 @@ button { color: inherit; }
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto 1fr;
   background:
     radial-gradient(circle at 40% 15%, rgba(71, 93, 160, 0.13), transparent 35%),
     #090d17;
@@ -124,8 +124,9 @@ button { color: inherit; }
 .search-results button:hover { background: #1a2232; }
 .search-results small { color: #74829b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.toolbar-actions { display: flex; align-items: center; gap: 8px; }
-.toolbar-actions button {
+.toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.toolbar-actions > button,
+.view-switch button {
   height: 38px;
   padding: 0 13px;
   border: 1px solid #2b3549;
@@ -135,10 +136,33 @@ button { color: inherit; }
   color: #b1bbcd;
   font-size: 12px;
 }
-.toolbar-actions button:hover, .toolbar-actions button.active {
+.toolbar-actions > button:hover,
+.toolbar-actions > button.active {
   border-color: rgba(255, 77, 94, .48);
   color: #ff8994;
   background: rgba(255, 77, 94, .09);
+}
+.view-switch {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid #283248;
+  border-radius: 11px;
+  background: #0a101b;
+}
+.view-switch button {
+  height: 31px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+}
+.view-switch button.selected {
+  color: #e9eef7;
+  background: #1b2435;
+  box-shadow: inset 0 0 0 1px #35415a;
 }
 .source-pill {
   padding: 6px 9px;
@@ -149,6 +173,31 @@ button { color: inherit; }
   font-size: 11px;
 }
 .source-pill.demo { color: #e3b56b; background: rgba(227,181,107,.07); border-color: rgba(227,181,107,.22); }
+
+.focus-bar {
+  min-height: 38px;
+  padding: 6px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #1a2231;
+  background: #0b111c;
+  color: #7f8da5;
+  font-size: 12px;
+}
+.focus-bar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid #2a354a;
+  border-radius: 7px;
+  background: #111827;
+  color: #aeb8ca;
+  cursor: pointer;
+}
+.focus-bar button:hover { border-color: #465775; color: #eef2f8; }
+.focus-bar strong { color: #dce4ef; font-weight: 600; }
 
 .workspace {
   min-height: 0;
@@ -210,6 +259,35 @@ button { color: inherit; }
   font-size: 11px;
   word-break: break-all;
 }
+.metadata-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.metadata-grid div {
+  padding: 9px 10px;
+  display: grid;
+  gap: 2px;
+  border: 1px solid #202a3b;
+  border-radius: 8px;
+  background: #101725;
+}
+.metadata-grid strong { color: #e2e8f2; font-size: 15px; }
+.metadata-grid span { color: #6f7d95; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.primary-action {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 14px;
+  border: 1px solid #4b5e82;
+  border-radius: 9px;
+  background: #1b2940;
+  color: #e3eaf5;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+.primary-action:hover { border-color: #7188b8; background: #22324d; }
 .connection-list { display: grid; gap: 7px; }
 .connection-list button {
   width: 100%;
@@ -237,6 +315,12 @@ button { color: inherit; }
 .empty-inspector p { font-size: 12px; line-height: 1.6; }
 .muted { color: #66758e; }
 
+@media (max-width: 1000px) {
+  .toolbar { align-items: stretch; flex-direction: column; }
+  .search-wrap { width: 100%; min-width: 0; }
+  .toolbar-actions { justify-content: flex-start; }
+}
+
 @media (max-width: 900px) {
   .workspace { grid-template-columns: 1fr; }
   .graph-panel { min-height: 560px; }
@@ -247,7 +331,8 @@ button { color: inherit; }
 @media (max-width: 680px) {
   .topbar { align-items: flex-start; flex-direction: column; }
   .status-strip { justify-content: flex-start; }
-  .toolbar { align-items: stretch; flex-direction: column; }
-  .search-wrap { width: 100%; min-width: 0; }
-  .toolbar-actions { justify-content: space-between; }
+  .toolbar-actions { align-items: flex-start; flex-direction: column; }
+  .view-switch { width: 100%; }
+  .view-switch button { flex: 1; justify-content: center; }
+  .focus-bar { align-items: flex-start; flex-direction: column; }
 }
