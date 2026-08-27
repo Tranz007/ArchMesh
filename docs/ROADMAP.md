@@ -13,7 +13,7 @@ Delivered:
 - Sigma.js interactive graph;
 - search and inspection;
 - selectable nodes and connections;
-- health-aware nodes and edges;
+- health-aware node/edge schema;
 - errors-only visualization;
 - project documentation and agent guardrails;
 - clean CI validation and self-scan.
@@ -31,7 +31,8 @@ Delivered:
 - product/feature grouping through configuration and detection;
 - Architecture view and feature drill-down;
 - richer directional inspector;
-- explicit provenance for configured versus detected feature semantics.
+- explicit provenance for configured versus detected feature semantics;
+- feature/product change-state aggregation from exact source impact.
 
 Remaining:
 
@@ -72,14 +73,18 @@ Delivered:
 - reverse-dependency traversal;
 - dedicated Changes view;
 - change-state inspector explanations;
+- feature-level change aggregation in Architecture view;
+- product-level change aggregation;
+- direct changed/affected member counts on feature nodes;
+- cross-feature relationship change propagation;
 - health remains independent from change state.
 
 Remaining:
 
-- feature-level change aggregation in Architecture view;
 - bounded traversal controls;
 - graph comparisons between persisted scans/commits;
 - richer Git status/commit context;
+- architecture drift visualization;
 - change history and change-to-failure correlation.
 
 ## Slice 5 — Local health
@@ -153,8 +158,8 @@ Goals:
 
 ## Near-term priorities
 
-1. Incremental scanning and graph deltas for watch mode.
-2. Feature-level change aggregation and architecture drift visualization.
+1. Architecture drift and graph-to-graph comparison.
+2. Incremental scanning and graph deltas for watch mode.
 3. More useful platform semantics for Firebase, Stripe, OpenAI, WorkOS, and Resend.
 4. Test/build/runtime failure adapters.
 5. Source-editor navigation from graph entities.
