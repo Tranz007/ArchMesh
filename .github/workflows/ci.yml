@@ -41,5 +41,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Compiled CLI help
+        run: node dist/cli.js --help
+
+      - name: Package dry run
+        run: npm run pack:check
+
       - name: Self scan
         run: npm run scan -- .
