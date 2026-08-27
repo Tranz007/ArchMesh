@@ -108,6 +108,10 @@ function ChangeBadge({ change }: { change?: ChangeState }) {
   return <div className={`change-badge ${change}`}>{changeLabel[change]}</div>;
 }
 
+function positiveCount(value: unknown) {
+  return typeof value === 'number' && value > 0 ? value : undefined;
+}
+
 export default function App() {
   const [data, setData] = useState<ArchGraphData>(sampleGraph);
   const [source, setSource] = useState<'scan' | 'demo'>('demo');
@@ -255,6 +259,10 @@ export default function App() {
   const serverActionCount = selectedNode?.metadata?.serverActionCount;
   const provider = selectedNode?.metadata?.provider;
   const resourceType = selectedNode?.metadata?.resourceType;
+  const changedMembers = positiveCount(selectedNode?.metadata?.changedMembers);
+  const affectedMembers = positiveCount(selectedNode?.metadata?.affectedMembers);
+  const changedFeatures = positiveCount(selectedNode?.metadata?.changedFeatures);
+  const affectedFeatures = positiveCount(selectedNode?.metadata?.affectedFeatures);
 
   const searchPlaceholder = viewMode === 'architecture'
     ? 'Find a feature, integration, service…'
@@ -285,6 +293,12 @@ export default function App() {
             <>
               <span className="status status-error"><XCircle size={14} /> {counts.error} errors</span>
               <span className="status status-impact"><AlertTriangle size={14} /> {counts.impacted} impacted</span>
+              {source === 'scan' && counts.changed > 0 && (
+                <span className="status status-changed"><GitBranch size={14} /> {counts.changed} changed</span>
+              )}
+              {source === 'scan' && counts.affected > 0 && (
+                <span className="status status-affected"><CircleDot size={14} /> {counts.affected} affected</span>
+              )}
             </>
           )}
           <span className="status"><CircleDot size={14} /> {visibleData.nodes.length} nodes</span>
@@ -463,6 +477,15 @@ export default function App() {
                   <div><strong>{selectedNode.metadata.routes ?? 0}</strong><span>Routes</span></div>
                   <div><strong>{selectedNode.metadata.apis ?? 0}</strong><span>APIs</span></div>
                   <div><strong>{selectedNode.metadata.services ?? 0}</strong><span>Services</span></div>
+                  {changedMembers && <div className="metric-changed"><strong>{changedMembers}</strong><span>Changed</span></div>}
+                  {affectedMembers && <div className="metric-affected"><strong>{affectedMembers}</strong><span>Affected</span></div>}
+                </div>
+              )}
+
+              {selectedNode.kind === 'product' && (changedFeatures || affectedFeatures) && (
+                <div className="metadata-grid" aria-label="Product change summary">
+                  {changedFeatures && <div className="metric-changed"><strong>{changedFeatures}</strong><span>Changed features</span></div>}
+                  {affectedFeatures && <div className="metric-affected"><strong>{affectedFeatures}</strong><span>Affected features</span></div>}
                 </div>
               )}
 
@@ -473,12 +496,20 @@ export default function App() {
               )}
               {selectedNode.change === 'changed' && (
                 <p className="change-note changed">
-                  This source file was changed directly in the selected Git comparison.
+                  {selectedNode.kind === 'feature'
+                    ? 'This feature contains source that changed directly in the selected Git comparison.'
+                    : selectedNode.kind === 'product'
+                      ? 'This project contains one or more features with directly changed source.'
+                      : 'This source file was changed directly in the selected Git comparison.'}
                 </p>
               )}
               {selectedNode.change === 'affected' && (
                 <p className="change-note">
-                  This entity depends, directly or transitively, on changed code. ArchMesh is showing structural impact, not claiming behavior changed.
+                  {selectedNode.kind === 'feature'
+                    ? 'This feature depends on changed source elsewhere. ArchMesh is showing structural impact, not claiming behavior changed.'
+                    : selectedNode.kind === 'product'
+                      ? 'This project is structurally affected by changed code, but contains no directly changed feature in the current projection.'
+                      : 'This entity depends, directly or transitively, on changed code. ArchMesh is showing structural impact, not claiming behavior changed.'}
                 </p>
               )}
 
