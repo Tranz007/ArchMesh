@@ -3,6 +3,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import type { ArchEdge, ArchGraphData, ArchNode, NodeKind } from '../types.js';
 import { configuredFeatureForPath, loadArchMeshConfig } from './config.js';
+import { collectFirestoreAccesses, collectHttpCalls } from './semantics.js';
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 const IGNORED_DIRS = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'coverage', '.turbo']);
@@ -208,6 +209,20 @@ function scriptKindFor(file: string) {
   return ts.ScriptKind.TS;
 }
 
+function safeHttpHost(url: string) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+    return parsed.host;
+  } catch {
+    return undefined;
+  }
+}
+
+function resourceId(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
+}
+
 export async function scanProject(rootInput: string): Promise<ArchGraphData> {
   const root = path.resolve(rootInput);
   const projectName = path.basename(root);
@@ -219,6 +234,13 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
   const nodes = new Map<string, ArchNode>();
   const edges: ArchEdge[] = [];
   const edgeKeys = new Set<string>();
+
+  const addEdge = (edge: Omit<ArchEdge, 'id'>) => {
+    const key = `${edge.source}->${edge.target}:${edge.relation}:${edge.label ?? ''}`;
+    if (edgeKeys.has(key)) return;
+    edgeKeys.add(key);
+    edges.push({ ...edge, id: `edge:${edges.length + 1}` });
+  };
 
   for (const absolute of files) {
     const relative = toPosix(path.relative(root, absolute));
@@ -251,6 +273,13 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
     });
   }
 
+  const apiRouteByPath = new Map<string, string>();
+  for (const node of nodes.values()) {
+    if (node.kind !== 'api') continue;
+    const routePath = node.metadata?.routePath;
+    if (typeof routePath === 'string') apiRouteByPath.set(routePath, node.id);
+  }
+
   for (const absolute of files) {
     const relative = toPosix(path.relative(root, absolute));
     const sourceId = nodeIdForFile(relative);
@@ -263,6 +292,7 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
       scriptKindFor(absolute),
     );
     const node = nodes.get(sourceId);
+    const imports = collectImports(sourceFile);
 
     if (node) {
       const methods = node.kind === 'api' ? exportedHttpMethods(sourceFile) : [];
@@ -276,7 +306,7 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
       }
     }
 
-    for (const specifier of collectImports(sourceFile)) {
+    for (const specifier of imports) {
       let targetId: string | undefined;
       const targetPath = specifier.startsWith('.')
         ? await resolveRelativeImport(absolute, specifier, root)
@@ -302,16 +332,73 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
 
       if (!targetId || !nodes.has(targetId)) continue;
       const relation = targetId.startsWith('integration:') ? 'integrates-with' : 'imports';
-      const key = `${sourceId}->${targetId}:${relation}`;
-      if (edgeKeys.has(key)) continue;
-      edgeKeys.add(key);
-      edges.push({
-        id: `edge:${edges.length + 1}`,
+      addEdge({ source: sourceId, target: targetId, relation, health: 'healthy' });
+    }
+
+    for (const call of collectHttpCalls(sourceFile)) {
+      const localPath = call.url.startsWith('/') ? call.url.split('?')[0] : undefined;
+      const localApiId = localPath ? apiRouteByPath.get(localPath) : undefined;
+
+      if (localApiId) {
+        addEdge({
+          source: sourceId,
+          target: localApiId,
+          relation: 'calls',
+          health: 'healthy',
+          label: `${call.method} ${localPath}`,
+        });
+        continue;
+      }
+
+      const host = safeHttpHost(call.url);
+      if (!host) continue;
+      const integrationId = `integration:http:${resourceId(host)}`;
+      if (!nodes.has(integrationId)) {
+        nodes.set(integrationId, {
+          id: integrationId,
+          label: host,
+          kind: 'integration',
+          health: 'healthy',
+          metadata: { provider: 'HTTP', host },
+        });
+      }
+      addEdge({
         source: sourceId,
-        target: targetId,
-        relation,
+        target: integrationId,
+        relation: 'calls',
         health: 'healthy',
+        label: `${call.method} ${call.url}`,
       });
+    }
+
+    const usesFirestore = imports.some((specifier) =>
+      /^(firebase|firebase-admin)(\/.*firestore|\/firestore|$)/.test(specifier),
+    );
+
+    if (usesFirestore) {
+      for (const access of collectFirestoreAccesses(sourceFile)) {
+        const dataId = `data:firestore:${resourceId(access.collection)}`;
+        if (!nodes.has(dataId)) {
+          nodes.set(dataId, {
+            id: dataId,
+            label: access.collection,
+            kind: 'data',
+            health: 'healthy',
+            metadata: {
+              provider: 'Firebase',
+              resourceType: 'Firestore collection',
+              collection: access.collection,
+            },
+          });
+        }
+        addEdge({
+          source: sourceId,
+          target: dataId,
+          relation: access.relation,
+          health: 'healthy',
+          label: `Firestore ${access.operation}`,
+        });
+      }
     }
   }
 
