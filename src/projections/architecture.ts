@@ -88,10 +88,17 @@ function addEdge(edges: ArchEdge[], dedupe: Map<string, ArchEdge>, edge: Omit<Ar
   const key = `${edge.source}->${edge.target}:${edge.relation}`;
   const existing = dedupe.get(key);
   if (existing) {
+    const incomingIsAtLeastAsSevere = healthRank[edge.health] >= healthRank[existing.health];
     existing.health = worstHealth(existing.health, edge.health);
+    if (!existing.label && edge.label) existing.label = edge.label;
+    if (incomingIsAtLeastAsSevere && edge.metadata) existing.metadata = { ...edge.metadata };
     return;
   }
-  const created: ArchEdge = { ...edge, id: `projection:${edges.length + 1}` };
+  const created: ArchEdge = {
+    ...edge,
+    metadata: edge.metadata ? { ...edge.metadata } : undefined,
+    id: `projection:${edges.length + 1}`,
+  };
   edges.push(created);
   dedupe.set(key, created);
 }
@@ -219,6 +226,7 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
         relation: 'integrates-with',
         health: edge.health,
         label: edge.label,
+        metadata: edge.metadata,
       });
       continue;
     }
@@ -231,6 +239,7 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
         relation: 'integrates-with',
         health: edge.health,
         label: edge.label,
+        metadata: edge.metadata,
       });
       continue;
     }
@@ -241,6 +250,8 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
         target: targetFeature,
         relation: 'depends-on',
         health: edge.health,
+        label: edge.label,
+        metadata: edge.metadata,
       });
     }
   }
@@ -312,6 +323,7 @@ export function projectArchitecture(data: ArchGraphData, focusedFeatureId?: stri
           relation: edge.relation,
           health: edge.health,
           label: edge.label,
+          metadata: edge.metadata,
         });
       }
 
