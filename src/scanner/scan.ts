@@ -29,14 +29,14 @@ function classifyFile(relativePath: string): NodeKind {
   return 'file';
 }
 
-async function walk(dir: string, root: string, files: string[]) {
+async function walk(dir: string, files: string[]) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
     if (entry.name.startsWith('.') && entry.name !== '.well-known') continue;
     if (IGNORED_DIRS.has(entry.name)) continue;
     const absolute = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      await walk(absolute, root, files);
+      await walk(absolute, files);
       continue;
     }
     if (!entry.isFile()) continue;
@@ -64,10 +64,48 @@ async function resolveRelativeImport(fromFile: string, specifier: string, root: 
   for (const candidate of candidates) {
     if (!(await fileExists(candidate))) continue;
     const relative = path.relative(root, candidate);
-    if (relative.startsWith('..')) return undefined;
+    if (relative.startsWith('..') || path.isAbsolute(relative)) return undefined;
     return toPosix(relative);
   }
   return undefined;
+}
+
+function loadCompilerOptions(root: string): ts.CompilerOptions {
+  const configPath = ts.findConfigFile(root, ts.sys.fileExists, 'tsconfig.json')
+    ?? ts.findConfigFile(root, ts.sys.fileExists, 'jsconfig.json');
+
+  if (!configPath) {
+    return {
+      allowJs: true,
+      jsx: ts.JsxEmit.Preserve,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      module: ts.ModuleKind.ESNext,
+    };
+  }
+
+  const config = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (config.error) return {};
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath));
+  return parsed.options;
+}
+
+function resolveConfiguredImport(
+  fromFile: string,
+  specifier: string,
+  root: string,
+  compilerOptions: ts.CompilerOptions,
+) {
+  const resolution = ts.resolveModuleName(specifier, fromFile, compilerOptions, ts.sys).resolvedModule;
+  if (!resolution) return undefined;
+
+  const resolved = path.resolve(resolution.resolvedFileName);
+  if (resolved.includes(`${path.sep}node_modules${path.sep}`)) return undefined;
+  if (/\.d\.[cm]?ts$/.test(resolved)) return undefined;
+
+  const relative = path.relative(root, resolved);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) return undefined;
+  if (!SOURCE_EXTENSIONS.includes(path.extname(resolved))) return undefined;
+  return toPosix(relative);
 }
 
 function integrationFor(specifier: string) {
@@ -99,11 +137,20 @@ function collectImports(sourceFile: ts.SourceFile) {
   return [...new Set(imports)];
 }
 
+function scriptKindFor(file: string) {
+  const extension = path.extname(file);
+  if (extension === '.tsx') return ts.ScriptKind.TSX;
+  if (extension === '.jsx') return ts.ScriptKind.JSX;
+  if (extension === '.js' || extension === '.mjs' || extension === '.cjs') return ts.ScriptKind.JS;
+  return ts.ScriptKind.TS;
+}
+
 export async function scanProject(rootInput: string): Promise<ArchGraphData> {
   const root = path.resolve(rootInput);
   const projectName = path.basename(root);
+  const compilerOptions = loadCompilerOptions(root);
   const files: string[] = [];
-  await walk(root, root, files);
+  await walk(root, files);
 
   const nodes = new Map<string, ArchNode>();
   const edges: ArchEdge[] = [];
@@ -130,14 +177,17 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
       text,
       ts.ScriptTarget.Latest,
       true,
-      absolute.endsWith('.tsx') || absolute.endsWith('.jsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+      scriptKindFor(absolute),
     );
 
     for (const specifier of collectImports(sourceFile)) {
       let targetId: string | undefined;
-      if (specifier.startsWith('.')) {
-        const targetPath = await resolveRelativeImport(absolute, specifier, root);
-        if (targetPath) targetId = nodeIdForFile(targetPath);
+      const targetPath = specifier.startsWith('.')
+        ? await resolveRelativeImport(absolute, specifier, root)
+        : resolveConfiguredImport(absolute, specifier, root, compilerOptions);
+
+      if (targetPath) {
+        targetId = nodeIdForFile(targetPath);
       } else {
         const integration = integrationFor(specifier);
         if (integration) {
@@ -155,14 +205,15 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
       }
 
       if (!targetId || !nodes.has(targetId)) continue;
-      const key = `${sourceId}->${targetId}:imports`;
+      const relation = targetId.startsWith('integration:') ? 'integrates-with' : 'imports';
+      const key = `${sourceId}->${targetId}:${relation}`;
       if (edgeKeys.has(key)) continue;
       edgeKeys.add(key);
       edges.push({
         id: `edge:${edges.length + 1}`,
         source: sourceId,
         target: targetId,
-        relation: targetId.startsWith('integration:') ? 'integrates-with' : 'imports',
+        relation,
         health: 'healthy',
       });
     }
