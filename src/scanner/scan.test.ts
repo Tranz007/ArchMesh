@@ -47,6 +47,31 @@ describe('scanProject', () => {
     );
   });
 
+  it('resolves TypeScript path aliases to local files', async () => {
+    const root = await fixture({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          paths: { '@/*': ['src/*'] },
+          moduleResolution: 'Bundler',
+          module: 'ESNext',
+        },
+      }),
+      'src/app/page.tsx': `import { Card } from '@/components/Card';\nexport default function Page(){ return <Card /> }`,
+      'src/components/Card.tsx': `export function Card(){ return <div>Card</div> }`,
+    });
+
+    const graph = await scanProject(root);
+    const page = graph.nodes.find((node) => node.path === 'src/app/page.tsx');
+    const card = graph.nodes.find((node) => node.path === 'src/components/Card.tsx');
+
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: page?.id, target: card?.id, relation: 'imports' }),
+      ]),
+    );
+  });
+
   it('detects dynamic imports nested inside code', async () => {
     const root = await fixture({
       'src/load.ts': `export async function load(){ return import('./feature') }`,
