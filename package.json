@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "scan": "tsx src/scanner/cli.ts",
     "atlas": "tsx src/cli.ts",
+    "ux:install": "npx skills add Tranz007/ux-skills --all",
     "test": "vitest run",
     "typecheck": "tsc -b --pretty false"
   },
