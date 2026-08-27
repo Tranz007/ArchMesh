@@ -55,6 +55,41 @@
   pointer-events: none;
 }
 
+.legend-kind {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  flex: 0 0 auto;
+  background: #7f8da8;
+}
+
+.legend-kind.product {
+  background: #d6e2f5;
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.legend-kind.feature {
+  background: #6f95d8;
+  border-radius: 50%;
+}
+
+.legend-kind.service {
+  background: #53a8c7;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
+
+.legend-kind.data {
+  width: 9px;
+  background: #4fae92;
+  border-radius: 50% / 28%;
+}
+
+.legend-kind.integration {
+  background: #a178d0;
+  transform: rotate(45deg);
+}
+
 @media (max-width: 680px) {
   .graph-controls span {
     display: none;
