@@ -4,9 +4,9 @@ import { featureKeyForPath, projectArchitecture } from './architecture';
 
 describe('featureKeyForPath', () => {
   it('finds Next.js product areas and shared code', () => {
-    expect(featureKeyForPath('src/app/hiring/candidates/page.tsx')).toBe('hiring');
-    expect(featureKeyForPath('src/app/api/story/publish/route.ts')).toBe('story');
-    expect(featureKeyForPath('src/features/campus/components/Card.tsx')).toBe('campus');
+    expect(featureKeyForPath('src/app/orders/[id]/page.tsx')).toBe('orders');
+    expect(featureKeyForPath('src/app/api/catalog/publish/route.ts')).toBe('catalog');
+    expect(featureKeyForPath('src/features/accounts/components/Card.tsx')).toBe('accounts');
     expect(featureKeyForPath('src/components/Button.tsx')).toBe('shared-ui');
     expect(featureKeyForPath('src/services/auth.ts')).toBe('shared-core');
   });
@@ -14,20 +14,20 @@ describe('featureKeyForPath', () => {
 
 describe('projectArchitecture', () => {
   const graph: ArchGraphData = {
-    project: 'Vetttd',
+    project: 'ExampleApp',
     generatedAt: '2026-08-27T00:00:00.000Z',
     nodes: [
-      { id: 'story-page', label: 'page.tsx', kind: 'route', path: 'src/app/story/page.tsx', health: 'healthy' },
-      { id: 'story-service', label: 'story-service.ts', kind: 'service', path: 'src/app/story/story-service.ts', health: 'error' },
-      { id: 'hiring-page', label: 'page.tsx', kind: 'route', path: 'src/app/hiring/page.tsx', health: 'impacted' },
+      { id: 'catalog-page', label: 'page.tsx', kind: 'route', path: 'src/app/catalog/page.tsx', health: 'healthy' },
+      { id: 'catalog-service', label: 'catalog-service.ts', kind: 'service', path: 'src/app/catalog/catalog-service.ts', health: 'error' },
+      { id: 'orders-page', label: 'page.tsx', kind: 'route', path: 'src/app/orders/page.tsx', health: 'impacted' },
       { id: 'stripe', label: 'Stripe', kind: 'integration', health: 'healthy' },
     ],
     edges: [
-      { id: 'e1', source: 'story-page', target: 'story-service', relation: 'imports', health: 'healthy' },
-      { id: 'e2', source: 'hiring-page', target: 'story-service', relation: 'imports', health: 'impacted' },
+      { id: 'e1', source: 'catalog-page', target: 'catalog-service', relation: 'imports', health: 'healthy' },
+      { id: 'e2', source: 'orders-page', target: 'catalog-service', relation: 'imports', health: 'impacted' },
       {
         id: 'e3',
-        source: 'story-service',
+        source: 'catalog-service',
         target: 'stripe',
         relation: 'integrates-with',
         health: 'error',
@@ -41,17 +41,17 @@ describe('projectArchitecture', () => {
 
     expect(projection.nodes).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'feature:story', kind: 'feature' }),
-        expect.objectContaining({ id: 'feature:hiring', kind: 'feature' }),
+        expect.objectContaining({ id: 'feature:catalog', kind: 'feature' }),
+        expect.objectContaining({ id: 'feature:orders', kind: 'feature' }),
         expect.objectContaining({ id: 'stripe', kind: 'integration' }),
       ]),
     );
-    expect(projection.nodes.some((node) => node.id === 'story-page')).toBe(false);
+    expect(projection.nodes.some((node) => node.id === 'catalog-page')).toBe(false);
     expect(projection.edges).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ source: 'feature:hiring', target: 'feature:story', relation: 'depends-on' }),
+        expect.objectContaining({ source: 'feature:orders', target: 'feature:catalog', relation: 'depends-on' }),
         expect.objectContaining({
-          source: 'feature:story',
+          source: 'feature:catalog',
           target: 'stripe',
           relation: 'integrates-with',
           health: 'error',
@@ -62,29 +62,29 @@ describe('projectArchitecture', () => {
   });
 
   it('drills into one feature without expanding unrelated files', () => {
-    const projection = projectArchitecture(graph, 'feature:story').graph;
+    const projection = projectArchitecture(graph, 'feature:catalog').graph;
 
-    expect(projection.nodes.some((node) => node.id === 'story-page')).toBe(true);
-    expect(projection.nodes.some((node) => node.id === 'story-service')).toBe(true);
-    expect(projection.nodes.some((node) => node.id === 'hiring-page')).toBe(false);
-    expect(projection.nodes.some((node) => node.id === 'feature:hiring')).toBe(true);
+    expect(projection.nodes.some((node) => node.id === 'catalog-page')).toBe(true);
+    expect(projection.nodes.some((node) => node.id === 'catalog-service')).toBe(true);
+    expect(projection.nodes.some((node) => node.id === 'orders-page')).toBe(false);
+    expect(projection.nodes.some((node) => node.id === 'feature:orders')).toBe(true);
     expect(projection.nodes.some((node) => node.id === 'stripe')).toBe(true);
   });
 
   it('uses configured feature identity and label before path inference', () => {
     const configuredGraph: ArchGraphData = {
-      project: 'Vetttd',
+      project: 'ExampleApp',
       generatedAt: graph.generatedAt,
       nodes: [
         {
-          id: 'profile',
+          id: 'browse',
           label: 'page.tsx',
           kind: 'route',
-          path: 'src/app/profile/page.tsx',
+          path: 'src/app/browse/page.tsx',
           health: 'healthy',
           metadata: {
-            featureKey: 'story',
-            featureLabel: 'Vetttd Story',
+            featureKey: 'catalog',
+            featureLabel: 'Product Catalog',
             featureSource: 'config',
           },
         },
@@ -93,39 +93,39 @@ describe('projectArchitecture', () => {
     };
 
     const projection = projectArchitecture(configuredGraph).graph;
-    const story = projection.nodes.find((node) => node.id === 'feature:story');
+    const catalog = projection.nodes.find((node) => node.id === 'feature:catalog');
 
-    expect(story?.label).toBe('Vetttd Story');
-    expect(story?.metadata?.semanticSource).toBe('config');
-    expect(projection.nodes.some((node) => node.id === 'feature:profile')).toBe(false);
+    expect(catalog?.label).toBe('Product Catalog');
+    expect(catalog?.metadata?.semanticSource).toBe('config');
+    expect(projection.nodes.some((node) => node.id === 'feature:browse')).toBe(false);
   });
 
   it('rolls direct and affected code changes up to feature and product nodes', () => {
     const changedGraph: ArchGraphData = {
-      project: 'Vetttd',
+      project: 'ExampleApp',
       generatedAt: graph.generatedAt,
       nodes: [
         {
-          id: 'story-page',
+          id: 'catalog-page',
           label: 'page.tsx',
           kind: 'route',
-          path: 'src/app/story/page.tsx',
+          path: 'src/app/catalog/page.tsx',
           health: 'healthy',
           change: 'affected',
         },
         {
-          id: 'story-service',
-          label: 'story-service.ts',
+          id: 'catalog-service',
+          label: 'catalog-service.ts',
           kind: 'service',
-          path: 'src/app/story/story-service.ts',
+          path: 'src/app/catalog/catalog-service.ts',
           health: 'healthy',
           change: 'changed',
         },
         {
-          id: 'hiring-page',
+          id: 'orders-page',
           label: 'page.tsx',
           kind: 'route',
-          path: 'src/app/hiring/page.tsx',
+          path: 'src/app/orders/page.tsx',
           health: 'healthy',
           change: 'affected',
         },
@@ -133,16 +133,16 @@ describe('projectArchitecture', () => {
       edges: [
         {
           id: 'e1',
-          source: 'story-page',
-          target: 'story-service',
+          source: 'catalog-page',
+          target: 'catalog-service',
           relation: 'imports',
           health: 'healthy',
           change: 'affected',
         },
         {
           id: 'e2',
-          source: 'hiring-page',
-          target: 'story-service',
+          source: 'orders-page',
+          target: 'catalog-service',
           relation: 'imports',
           health: 'healthy',
           change: 'affected',
@@ -152,42 +152,42 @@ describe('projectArchitecture', () => {
 
     const projection = projectArchitecture(changedGraph).graph;
     const product = projection.nodes.find((node) => node.kind === 'product');
-    const story = projection.nodes.find((node) => node.id === 'feature:story');
-    const hiring = projection.nodes.find((node) => node.id === 'feature:hiring');
-    const hiringToStory = projection.edges.find(
-      (edge) => edge.source === 'feature:hiring' && edge.target === 'feature:story',
+    const catalog = projection.nodes.find((node) => node.id === 'feature:catalog');
+    const orders = projection.nodes.find((node) => node.id === 'feature:orders');
+    const ordersToCatalog = projection.edges.find(
+      (edge) => edge.source === 'feature:orders' && edge.target === 'feature:catalog',
     );
 
-    expect(story?.change).toBe('changed');
-    expect(story?.metadata?.changedMembers).toBe(1);
-    expect(story?.metadata?.affectedMembers).toBe(1);
-    expect(hiring?.change).toBe('affected');
-    expect(hiring?.metadata?.changedMembers).toBe(0);
-    expect(hiring?.metadata?.affectedMembers).toBe(1);
+    expect(catalog?.change).toBe('changed');
+    expect(catalog?.metadata?.changedMembers).toBe(1);
+    expect(catalog?.metadata?.affectedMembers).toBe(1);
+    expect(orders?.change).toBe('affected');
+    expect(orders?.metadata?.changedMembers).toBe(0);
+    expect(orders?.metadata?.affectedMembers).toBe(1);
     expect(product?.change).toBe('changed');
     expect(product?.metadata?.changedFeatures).toBe(1);
     expect(product?.metadata?.affectedFeatures).toBe(1);
-    expect(hiringToStory?.change).toBe('affected');
+    expect(ordersToCatalog?.change).toBe('affected');
   });
 
   it('preserves member change state in a focused feature view', () => {
     const changedGraph: ArchGraphData = {
-      project: 'Vetttd',
+      project: 'ExampleApp',
       generatedAt: graph.generatedAt,
       nodes: [
         {
-          id: 'story-page',
+          id: 'catalog-page',
           label: 'page.tsx',
           kind: 'route',
-          path: 'src/app/story/page.tsx',
+          path: 'src/app/catalog/page.tsx',
           health: 'healthy',
           change: 'affected',
         },
         {
-          id: 'story-service',
-          label: 'story-service.ts',
+          id: 'catalog-service',
+          label: 'catalog-service.ts',
           kind: 'service',
-          path: 'src/app/story/story-service.ts',
+          path: 'src/app/catalog/catalog-service.ts',
           health: 'healthy',
           change: 'changed',
         },
@@ -195,8 +195,8 @@ describe('projectArchitecture', () => {
       edges: [
         {
           id: 'e1',
-          source: 'story-page',
-          target: 'story-service',
+          source: 'catalog-page',
+          target: 'catalog-service',
           relation: 'imports',
           health: 'healthy',
           change: 'affected',
@@ -204,10 +204,10 @@ describe('projectArchitecture', () => {
       ],
     };
 
-    const projection = projectArchitecture(changedGraph, 'feature:story').graph;
-    const feature = projection.nodes.find((node) => node.id === 'feature:story');
+    const projection = projectArchitecture(changedGraph, 'feature:catalog').graph;
+    const feature = projection.nodes.find((node) => node.id === 'feature:catalog');
     const containsService = projection.edges.find(
-      (edge) => edge.source === 'feature:story' && edge.target === 'story-service',
+      (edge) => edge.source === 'feature:catalog' && edge.target === 'catalog-service',
     );
 
     expect(feature?.change).toBe('changed');
