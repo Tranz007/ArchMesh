@@ -1,0 +1,35 @@
+/* Keep the desktop graph workspace inside the visible browser viewport.
+   The focus bar is conditional, so the shell cannot rely on a fixed grid-row count. */
+@media (min-width: 901px) {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  .app-shell {
+    height: 100dvh;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .topbar,
+  .toolbar,
+  .focus-bar {
+    flex: 0 0 auto;
+  }
+
+  .workspace {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .graph-panel,
+  .inspector {
+    height: 100%;
+    min-height: 0;
+  }
+}
