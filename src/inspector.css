@@ -1,0 +1,135 @@
+.entity-facts {
+  margin: 16px 0 0;
+  display: grid;
+  gap: 7px;
+}
+
+.entity-facts div {
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  border: 1px solid #202a3b;
+  border-radius: 8px;
+  background: #0a0f19;
+}
+
+.entity-facts dt {
+  color: #65738b;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.entity-facts dd {
+  min-width: 0;
+  margin: 0;
+  color: #aebbd0;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.health-evidence {
+  margin-top: 15px;
+  padding: 12px;
+  border: 1px solid rgba(240, 180, 77, .3);
+  border-radius: 10px;
+  background: rgba(240, 180, 77, .07);
+}
+
+.health-evidence.error {
+  border-color: rgba(255, 77, 94, .34);
+  background: rgba(255, 77, 94, .08);
+}
+
+.health-evidence-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #f2bd62;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+
+.health-evidence.error .health-evidence-title { color: #ff8692; }
+.health-evidence p { margin: 8px 0 10px; color: #d9e0eb; font-size: 12px; line-height: 1.5; }
+.health-evidence dl { margin: 0; display: grid; gap: 4px; }
+.health-evidence dl div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
+.health-evidence dt { color: #77859c; font-size: 10px; text-transform: uppercase; }
+.health-evidence dd { margin: 0; color: #9ba8bc; font-size: 10px; overflow-wrap: anywhere; }
+
+.impact-note {
+  margin: 14px 0 0;
+  padding: 10px 11px;
+  border-left: 3px solid #ff8f70;
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 143, 112, .07);
+  color: #aeb7c7;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.edge-route {
+  margin-top: 17px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.edge-route button {
+  min-width: 0;
+  min-height: 68px;
+  padding: 9px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  border: 1px solid #263149;
+  border-radius: 9px;
+  background: #101725;
+  text-align: left;
+  cursor: pointer;
+}
+
+.edge-route button:hover { border-color: #455777; background: #151e2d; }
+.edge-route button small { color: #687790; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; }
+.edge-route button strong { min-width: 0; color: #dbe3ef; font-size: 11px; overflow-wrap: anywhere; }
+.edge-route > span {
+  min-width: 48px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  color: #6e7d96;
+}
+.edge-route > span em { max-width: 76px; font-size: 9px; font-style: normal; text-align: center; overflow-wrap: anywhere; }
+
+.connection-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.connection-section h3 > span {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  text-align: center;
+  color: #78869e;
+  background: #151d2b;
+  font-size: 10px;
+}
+
+.connection-section + .connection-section h3 {
+  margin-top: 20px;
+}
+
+@media (max-width: 420px) {
+  .edge-route { grid-template-columns: 1fr; }
+  .edge-route > span { min-height: 36px; }
+  .edge-route > span svg { transform: rotate(90deg); }
+}

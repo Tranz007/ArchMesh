@@ -1,0 +1,28 @@
+{
+  "features": [
+    {
+      "id": "story",
+      "label": "Story",
+      "paths": [
+        "src/app/story/**",
+        "src/features/story/**"
+      ]
+    },
+    {
+      "id": "hiring",
+      "label": "Hiring",
+      "paths": [
+        "src/app/hiring/**",
+        "src/features/hiring/**"
+      ]
+    },
+    {
+      "id": "campus",
+      "label": "Campus",
+      "paths": [
+        "src/app/campus/**",
+        "src/features/campus/**"
+      ]
+    }
+  ]
+}
