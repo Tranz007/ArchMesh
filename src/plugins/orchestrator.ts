@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { applyDirectionalFlowEvidence } from '../linkers/flow-evidence.js';
 import { linkStaticHttpEndpoints } from '../linkers/http-endpoints.js';
 import { applySystemBoundaries } from '../system/boundaries.js';
 import { mergeGraphContributions, mergeLanguageGraphs } from './merge.js';
@@ -82,6 +83,11 @@ export async function scanProjectWithPlugins(
   // Boundaries are applied before graph linkers so link evidence can say
   // whether a statically matched request crosses an app/service boundary.
   graph = await applySystemBoundaries(root, graph);
+
+  // Generic integration imports prove usage, not direction. Provider-matched
+  // read/write evidence can safely enrich those relationships before the
+  // viewer decides whether Flow should animate them.
+  graph = applyDirectionalFlowEvidence(graph);
 
   // Linkers run after all language/framework semantics exist. They may connect
   // evidence produced by different plugins, but they never fabricate a target

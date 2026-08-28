@@ -53,4 +53,38 @@ describe('projectTopology', () => {
       ]),
     );
   });
+
+  it('merges opposite integration directions when feature members collapse together', () => {
+    const graph: ArchGraphData = {
+      project: 'ExampleApp',
+      generatedAt: '2026-08-27T00:00:00.000Z',
+      nodes: [
+        { id: 'reader', label: 'reader.ts', kind: 'service', path: 'src/app/catalog/reader.ts', health: 'healthy' },
+        { id: 'writer', label: 'writer.ts', kind: 'service', path: 'src/app/catalog/writer.ts', health: 'healthy' },
+        { id: 'firebase', label: 'Firebase', kind: 'integration', health: 'healthy' },
+      ],
+      edges: [
+        {
+          id: 'read-integration',
+          source: 'reader',
+          target: 'firebase',
+          relation: 'integrates-with',
+          health: 'healthy',
+          metadata: { flowDirection: 'target-to-source' },
+        },
+        {
+          id: 'write-integration',
+          source: 'writer',
+          target: 'firebase',
+          relation: 'integrates-with',
+          health: 'healthy',
+          metadata: { flowDirection: 'source-to-target' },
+        },
+      ],
+    };
+
+    const topology = projectTopology(graph);
+    const integration = topology.edges.find((edge) => edge.source === 'feature:catalog' && edge.target === 'firebase');
+    expect(integration?.metadata?.flowDirection).toBe('both');
+  });
 });
