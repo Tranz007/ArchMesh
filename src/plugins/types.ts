@@ -4,6 +4,20 @@ export const ARCHMESH_PLUGIN_API_VERSION = 1 as const;
 
 export type ArchMeshPluginApiVersion = typeof ARCHMESH_PLUGIN_API_VERSION;
 
+export type PluginCapability =
+  | 'source-files'
+  | 'imports'
+  | 'module-resolution'
+  | 'components'
+  | 'services'
+  | 'routes'
+  | 'api-handlers'
+  | 'http-calls'
+  | 'data-resources'
+  | 'integrations'
+  | 'security-evidence'
+  | 'server-actions';
+
 export interface LanguagePluginContext {
   root: string;
 }
@@ -18,6 +32,8 @@ export interface LanguagePlugin {
   languages: string[];
   /** Source extensions the plugin is expected to understand. */
   extensions: string[];
+  /** Evidence capabilities currently produced by this parser. */
+  capabilities: PluginCapability[];
   /**
    * Produce a graph fragment from the project root. A plugin should return an
    * empty graph when the project contains none of its supported source files.
@@ -43,6 +59,8 @@ export interface FrameworkAdapter {
   displayName: string;
   /** Language plugins this adapter can enrich. */
   languagePluginIds: string[];
+  /** Additional semantic capabilities supplied by this adapter. */
+  capabilities: PluginCapability[];
   /** Return true only when repository evidence supports applying the adapter. */
   detect(context: FrameworkAdapterContext): boolean | Promise<boolean>;
   /**
