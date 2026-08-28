@@ -17,6 +17,20 @@ ArchMesh is pre-1.0 and its architecture may evolve quickly. Entries should stil
 - Feature drill-down that reveals exact implementation without expanding unrelated product areas.
 - Errors-only filtering.
 
+#### Focused understanding and explanation
+
+- Detected architecture Scenes that isolate meaningful integrations, product areas, routes/APIs, data entities, services, and other strong graph seeds.
+- Local saved views backed by stable graph identities and browser storage.
+- Scene direction and depth controls for bounded architectural context.
+- Multi-depth inbound, outbound, and bidirectional Trace.
+- Evidence-backed shortest-path finding between known graph entities, with explicit no-path states.
+- Deterministic “Why are these connected?” evidence in the connection inspector.
+- User-initiated hypothetical blast-radius projection that remains separate from Git change impact and runtime health.
+- Locally saved Journey stops for ordered architecture walkthroughs.
+- Journey playback that moves through bounded graph contexts rather than replaying the entire codebase.
+- Local Journey recording from the graph canvas, preferring MP4 when the browser supports it and truthfully falling back to WebM otherwise.
+- Health and Drift capability awareness so unavailable lenses do not appear active when no supporting evidence/history exists.
+
 #### Scanner and semantics
 
 - TypeScript/JavaScript repository scanning.
@@ -43,6 +57,7 @@ ArchMesh is pre-1.0 and its architecture may evolve quickly. Entries should stil
 - Health evidence on nodes and edges.
 - Selectable red connections showing source, target, relation, evidence, and timestamp.
 - Health/evidence preservation through Architecture and Topology aggregation.
+- Root graph capability metadata describing whether health evidence is actually attached to the current scan.
 
 #### Git change impact
 
@@ -71,27 +86,32 @@ ArchMesh is pre-1.0 and its architecture may evolve quickly. Entries should stil
 - Dedicated Drift view with teal added, pink removed, gold modified, and muted one-hop stable context.
 - Removed nodes and connections retained as selectable historical ghost entities.
 - Separate gitignored `public/archmesh-drift.json` generated locally and reset at watch-session start.
+- Explicit drift availability metadata distinguishing the initial no-baseline state from a real comparison.
 
 #### Project and contributor experience
 
 - `AGENTS.md` plus committed `.ux/` context.
 - Canonical UX Skills installer via `npm run ux:install`.
 - Product, architecture, graph, scanner, configuration, health, development, roadmap, UX Skills, security, contribution, and Code of Conduct documentation.
+- Dedicated Understand and Explain product contract and acceptance criteria.
 - MIT license.
-- GitHub Actions CI for install, typecheck, tests, production build, and ArchMesh self-scan.
+- GitHub Actions CI for install, typecheck, tests, production build, package smoke testing, self-scan, headless viewer rendering, and Flow smoke testing.
 
 ### Changed
 
-- The exact file graph remains the evidence layer while Architecture, Topology, Changes, and Drift are derived views.
-- Runtime health, source-control change state, and architecture drift are intentionally independent dimensions.
+- The exact file graph remains the evidence layer while Architecture, Topology, Changes, Drift, Scenes, Trace, Path, and Impact are derived views.
+- Runtime health, source-control change state, hypothetical impact, and architecture drift are intentionally independent dimensions.
+- Health-specific UI is hidden when the active scan has no attached health evidence.
+- Drift-specific UI is hidden until a watch session has a prior successful scan to compare.
+- Static Flow animation is explicitly illustrative directionality, not realtime traffic or health telemetry.
 - Current watch mode performs full graph rebuilds; incremental scanning is a future optimization rather than an undocumented assumption.
 
 ### Next
 
 - Incremental scan/content-hash caching and graph deltas for watch mode.
 - Large-repository progressive disclosure and layout stability.
-- Source-editor navigation.
+- Broader representative framework fixtures and cross-platform validation.
 - Richer Firebase, Stripe, OpenAI, WorkOS, and Resend semantics.
 - Test/build/browser/runtime health adapters.
 - Persisted snapshots, Git history, and change-to-failure correlation.
-- Packaging toward a one-command `npx archmesh .` experience.
+- Optional production telemetry connectors that preserve the local-first core.
