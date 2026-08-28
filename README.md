@@ -3,7 +3,7 @@
 **A local-first visual architecture explorer for modern software projects.**
 
 <p align="center">
-  <img src="./public/archmesh-hero.svg" alt="ArchMesh visual systems network" width="100%" />
+  <img src="./public/Hero.png" alt="ArchMesh visual systems network" width="100%" />
 </p>
 
 > **See how your system connects. See when it doesn't.**
