@@ -136,6 +136,53 @@ jobs:
 
           test -s /tmp/archmesh-system-overview.png
 
+      - name: Exercise visible Flow overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/system-overview-fixture.mjs
+          npm run dev -- --host 0.0.0.0 --port 4242 --strictPort > /tmp/archmesh-flow.log 2>&1 &
+          server_pid=$!
+          chrome_pid=""
+          cleanup() {
+            [ -z "$chrome_pid" ] || kill "$chrome_pid" 2>/dev/null || true
+            kill "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for i in {1..60}; do
+            if curl -fsS http://localhost:4242/ >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 0.5
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat /tmp/archmesh-flow.log
+            exit 1
+          fi
+
+          chrome="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$chrome"
+
+          "$chrome" \
+            --headless=new \
+            --no-sandbox \
+            --disable-dev-shm-usage \
+            --enable-webgl \
+            --use-angle=swiftshader \
+            --window-size=1425,990 \
+            --remote-debugging-address=127.0.0.1 \
+            --remote-debugging-port=9222 \
+            --user-data-dir=/tmp/archmesh-flow-chrome \
+            http://localhost:4242/ \
+            > /tmp/chrome-flow.log 2>&1 &
+          chrome_pid=$!
+
+          node scripts/flow-browser-smoke.mjs /tmp/archmesh-flow.png
+          test -s /tmp/archmesh-flow.png
+
       - name: Upload viewer diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -148,4 +195,7 @@ jobs:
             /tmp/archmesh-system-overview.png
             /tmp/archmesh-system-overview.log
             /tmp/chrome-system-overview.log
+            /tmp/archmesh-flow.png
+            /tmp/archmesh-flow.log
+            /tmp/chrome-flow.log
           if-no-files-found: warn
