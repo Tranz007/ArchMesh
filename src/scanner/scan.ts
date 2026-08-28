@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
+import { securityMetadataForFields } from '../security/classify.js';
 import type { ArchEdge, ArchGraphData, ArchNode, NodeKind } from '../types.js';
 import { configuredFeatureForPath, loadArchMeshConfig } from './config.js';
-import { collectFirestoreAccesses, collectHttpCalls } from './semantics.js';
+import { collectFirestoreAccesses, collectHttpCalls, type HttpCall } from './semantics.js';
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 const IGNORED_DIRS = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'coverage', '.turbo']);
@@ -222,11 +223,11 @@ function scriptKindFor(file: string) {
   return ts.ScriptKind.TS;
 }
 
-function safeHttpHost(url: string) {
+function safeHttpUrl(url: string) {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
-    return parsed.host;
+    return parsed;
   } catch {
     return undefined;
   }
@@ -234,6 +235,40 @@ function safeHttpHost(url: string) {
 
 function resourceId(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
+}
+
+function httpSecurityMetadata(call: HttpCall) {
+  const sensitive = securityMetadataForFields(call.bodyFields);
+  const parsed = safeHttpUrl(call.url);
+
+  if (!parsed) {
+    return {
+      ...sensitive,
+      securityBoundary: 'same-origin',
+      securityTransport: 'unknown',
+      securityTransportEvidence: 'Relative URL: transport inherits the deployment origin and cannot be proven from source alone.',
+    };
+  }
+
+  const cleartext = parsed.protocol === 'http:';
+  const sensitiveData = sensitive.securitySensitiveData === true;
+  return {
+    ...sensitive,
+    securityBoundary: 'external',
+    securityExternalBoundary: true,
+    securityTransport: cleartext ? 'cleartext' : 'tls-requested',
+    securityTransportEvidence: cleartext
+      ? 'Static URL uses http://.'
+      : 'Static URL uses https://; TLS is requested, but certificate/runtime configuration is not verified by this scan.',
+    ...(cleartext
+      ? {
+          securityFinding: sensitiveData ? 'sensitive-data-over-cleartext' : 'cleartext-transport',
+          securitySeverity: sensitiveData ? 'high' : 'warning',
+        }
+      : sensitiveData
+        ? { securityFinding: 'sensitive-data-crosses-external-boundary', securitySeverity: 'info' }
+        : {}),
+  };
 }
 
 export async function scanProject(rootInput: string): Promise<ArchGraphData> {
@@ -351,6 +386,7 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
     for (const call of collectHttpCalls(sourceFile)) {
       const localPath = call.url.startsWith('/') ? call.url.split('?')[0] : undefined;
       const localApiId = localPath ? apiRouteByPath.get(localPath) : undefined;
+      const securityMetadata = httpSecurityMetadata(call);
 
       if (localApiId) {
         addEdge({
@@ -359,20 +395,21 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
           relation: 'calls',
           health: 'healthy',
           label: `${call.method} ${localPath}`,
+          metadata: securityMetadata,
         });
         continue;
       }
 
-      const host = safeHttpHost(call.url);
-      if (!host) continue;
-      const integrationId = `integration:http:${resourceId(host)}`;
+      const parsed = safeHttpUrl(call.url);
+      if (!parsed) continue;
+      const integrationId = `integration:http:${resourceId(parsed.host)}`;
       if (!nodes.has(integrationId)) {
         nodes.set(integrationId, {
           id: integrationId,
-          label: host,
+          label: parsed.host,
           kind: 'integration',
           health: 'healthy',
-          metadata: { provider: 'HTTP', host },
+          metadata: { provider: 'HTTP', host: parsed.host, securityBoundary: 'external' },
         });
       }
       addEdge({
@@ -381,6 +418,7 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
         relation: 'calls',
         health: 'healthy',
         label: `${call.method} ${call.url}`,
+        metadata: securityMetadata,
       });
     }
 
@@ -401,6 +439,9 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
               provider: 'Firebase',
               resourceType: 'Firestore collection',
               collection: access.collection,
+              securityBoundary: 'managed-service',
+              securityStorage: 'unknown',
+              securityStorageEvidence: 'At-rest protection is not proven from repository source.',
             },
           });
         }
@@ -410,6 +451,12 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
           relation: access.relation,
           health: 'healthy',
           label: `Firestore ${access.operation}`,
+          metadata: {
+            ...securityMetadataForFields(access.fields),
+            securityBoundary: 'managed-service',
+            securityTransport: 'unknown',
+            securityTransportEvidence: 'Firebase SDK transport behavior is not verified from this source relationship alone.',
+          },
         });
       }
     }
