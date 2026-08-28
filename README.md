@@ -34,6 +34,7 @@ ArchMesh is pre-1.0, but already supports a useful TypeScript/JavaScript baselin
 - semantic node shapes and colors for products, features, services/APIs, routes, data, integrations, components, files, and modules;
 - Architecture Lenses for System Map, Product Areas, Data & Integrations, Routes & APIs, Security, Change Impact, Health, Architecture Drift, and Code Structure;
 - progressive disclosure so the default architecture view prioritizes meaningful product structure instead of opening as a file-level hairball;
+- directional **Trace from here** investigation with Inbound / Both / Outbound controls and progressive re-rooting;
 - optional directional Flow mode with small animated pulses for calls, reads, writes, and integration relationships;
 - bidirectional-looking flow when independent evidence exists in both directions between the same nodes;
 - security evidence for static sensitive payload fields, external boundaries, cleartext HTTP, TLS-requested HTTPS, and unknown protection states;
@@ -165,6 +166,22 @@ archmesh . --editor cursor
 ```
 
 ArchMesh validates that the requested source path resolves inside the scanned project before invoking a local editor CLI. Absolute machine paths are not embedded in the graph JSON.
+
+### Trace an architecture path
+
+Select a node and choose **Trace from here** to isolate that node and its immediate architecture neighborhood without leaving the active Lens.
+
+Trace supports:
+
+- **Inbound** — relationships pointing into the trace root;
+- **Both** — inbound and outbound relationships;
+- **Outbound** — relationships leaving the trace root.
+
+Trace is intentionally one hop. To continue investigating, select a visible neighboring node and choose **Continue trace from here**. ArchMesh re-roots the scene around that node so you can walk the architecture progressively instead of expanding several hops into another hairball.
+
+Trace preserves the active Lens. For example, tracing inside Security Lens keeps security connection colors and evidence. Flow can also remain active inside the smaller trace scene, which makes movement direction easier to understand.
+
+See [`docs/TRACE_INVESTIGATION.md`](docs/TRACE_INVESTIGATION.md).
 
 ### Animate directional flow
 
@@ -337,7 +354,7 @@ Project source
       │            │            │            │            │           │
       └────────────┴────────────┴──────┬─────┴────────────┴───────────┘
                                       ▼
-                             lenses + state overlays
+                         lenses + trace + state overlays
                                       │
                                       ▼
                              Three.js/WebGL 3D viewer
@@ -346,7 +363,7 @@ Project source
                                optional watch loop
 ```
 
-The exact code graph remains the evidence layer. Higher-level views are projections and comparisons, not replacements for the underlying relationships.
+The exact code graph remains the evidence layer. Higher-level views, traces, and comparisons are projections, not replacements for the underlying relationships.
 
 ## Design principles
 
@@ -358,6 +375,8 @@ The exact code graph remains the evidence layer. Higher-level views are projecti
 
 **Unknown is not absent.** If source evidence cannot prove a runtime or provider security control, ArchMesh says Unknown rather than secure or insecure.
 
+**Progressive investigation over expansion.** Trace begins with one hop and lets the user re-root deliberately instead of expanding an arbitrary number of relationships into another hairball.
+
 **Human architecture over file hairballs.** Start with product areas and features; reveal routes, services, data, files, and source detail progressively.
 
 **Error is not impact. Change is not failure. Drift is structural. Security is independent.** These meanings stay separate throughout the graph and inspector.
@@ -367,7 +386,7 @@ The exact code graph remains the evidence layer. Higher-level views are projecti
 ```text
 src/
 ├── scanner/       source scanning and static semantics
-├── projections/   architecture/topology/security/change/drift projections
+├── projections/   architecture/topology/security/trace/change/drift projections
 ├── security/      conservative sensitive-data classification
 ├── health/        health signals and propagation
 ├── changes/       Git change-impact analysis
@@ -388,6 +407,7 @@ src/
 - [Graph model](docs/GRAPH_MODEL.md)
 - [Scanner](docs/SCANNER.md)
 - [Configuration](docs/CONFIGURATION.md)
+- [Trace investigation](docs/TRACE_INVESTIGATION.md)
 - [Flow visualization](docs/FLOW_VISUALIZATION.md)
 - [Security Lens](docs/SECURITY_LENS.md)
 - [Health and observability](docs/HEALTH_AND_OBSERVABILITY.md)
