@@ -1,3 +1,4 @@
+import { withMergedFlowDirection } from '../flow';
 import type { ArchEdge, ArchGraphData, ArchNode, HealthState } from '../types';
 import { projectArchitecture } from './architecture';
 
@@ -22,9 +23,15 @@ function addEdge(edges: ArchEdge[], dedupe: Map<string, ArchEdge>, edge: Omit<Ar
   const existing = dedupe.get(key);
   if (existing) {
     const incomingIsAtLeastAsSevere = healthRank[edge.health] >= healthRank[existing.health];
+    const previousMetadata = existing.metadata;
     existing.health = worstHealth(existing.health, edge.health);
     if (!existing.label && edge.label) existing.label = edge.label;
-    if (incomingIsAtLeastAsSevere && edge.metadata) existing.metadata = { ...edge.metadata };
+    const preferredMetadata = incomingIsAtLeastAsSevere && edge.metadata
+      ? { ...edge.metadata }
+      : previousMetadata
+        ? { ...previousMetadata }
+        : undefined;
+    existing.metadata = withMergedFlowDirection(preferredMetadata, incomingIsAtLeastAsSevere ? previousMetadata : edge.metadata);
     return;
   }
   const created: ArchEdge = {
