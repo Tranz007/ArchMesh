@@ -25,7 +25,7 @@ A support level describes ArchMesh's evidence coverage. It does **not** mean Arc
 | **Node.js services / libraries** | **Structural** | TS/JS modules, imports, services/repositories/adapters, static `fetch()`, supported integrations | Framework route registration, queues, workers, and runtime-only loading need adapters |
 | **Express / Fastify / Hono** | **Structural** | Underlying TS/JS dependency graph and supported static HTTP/integration evidence | Route registration, middleware chains, request/response flow, framework-specific handlers |
 | **NestJS** | **Structural** | TypeScript dependency graph, generic service/component classification, supported integrations | Controllers, modules, providers, DI, decorators, guards/interceptors are not semantic entities yet |
-| **Angular** | **Structural** | TypeScript graph, components/services by convention, local imports, TS aliases, supported integrations | Angular Router, modules/standalone metadata, DI, templates, signals/RxJS flow, `HttpClient` semantics |
+| **Angular** | **Deep** | TypeScript graph plus `@Component`/`@Injectable` semantics, static templates, constructor/`inject()` DI, static client routes, nested paths, redirects, eager and lazy component targets | `HttpClient`, NgModule/standalone import graphs, guards/resolvers/interceptors, dynamic route config, RxJS/data-flow semantics |
 | **React Native / Expo** | **Structural** | TS/JS dependency graph, components, services, static `fetch()`, supported integrations | Expo Router/navigation, native modules, platform boundaries, app configuration semantics |
 | **Electron** | **Structural** | TS/JS graph across main/renderer source when inside the scanned root | IPC, preload/context bridge, process boundaries are not modeled yet |
 | **Python services / libraries** | **Structural** | `.py` source graph, absolute and relative package imports, root and `src/` layouts, module/service/data classification, selected integration imports | Dynamic imports, Python call graph, packaging/workspace semantics, framework-specific runtime meaning |
@@ -60,7 +60,9 @@ ArchMesh currently treats these as first-class source files:
 
 Files such as `.vue`, `.svelte`, `.astro`, `.java`, `.kt`, `.cs`, `.go`, `.rs`, `.rb`, and `.php` are not parsed as source nodes yet.
 
-Configuration files such as `tsconfig.json`, `jsconfig.json`, and `archmesh.config.json` can influence scanning even though they are not represented as ordinary source nodes.
+Angular static `templateUrl` files can appear as local graph nodes even though `.html` is not a general-purpose language plugin source format.
+
+Configuration files such as `tsconfig.json`, `jsconfig.json`, `angular.json`, and `archmesh.config.json` can influence scanning even though they are not represented as ordinary source nodes.
 
 ## Language-plugin capabilities today
 
@@ -78,7 +80,7 @@ The built-in JavaScript/TypeScript plugin provides:
 - security evidence on statically inspectable `fetch()` payload fields;
 - selected integration package detection.
 
-The Next.js adapter adds App Router semantics on top of that language graph.
+The Next.js and Angular adapters add framework-specific semantics on top of that shared language graph.
 
 ### Python
 
@@ -95,6 +97,23 @@ The built-in Python plugin uses a real Python syntax grammar and provides:
 - mixed-language graph merging with the JavaScript/TypeScript plugin.
 
 Framework-specific meaning is layered on afterward. The FastAPI adapter currently adds semantic request-facing endpoints while Django/Flask remain structural-only.
+
+## Angular adapter coverage
+
+The built-in Angular adapter currently recognizes defensible static evidence for:
+
+- Angular presence from `@angular/core` package metadata or `angular.json`;
+- `@Component` classes, including static selector and standalone metadata;
+- static `templateUrl` files as local architecture resources;
+- `@Injectable` classes as Angular services;
+- constructor-typed injection when the type resolves to a scanned local source node;
+- `inject(Service)` dependencies when the token resolves to a scanned local source node;
+- static `Routes` arrays when Angular Router is imported;
+- nested static route paths and redirects;
+- eager component targets from local imports;
+- static lazy `loadComponent(() => import(...))` source targets.
+
+Dynamic route paths are intentionally omitted. The adapter does not yet claim `HttpClient`, guards/resolvers/interceptors, NgModule/standalone import graphs, or RxJS flow semantics.
 
 ## FastAPI adapter coverage
 
@@ -128,21 +147,7 @@ A mixed repository can activate multiple language plugins in one scan. For examp
 
 ## What deeper framework support means
 
-A dedicated adapter should add semantic architecture without replacing the underlying source graph.
-
-For example, deeper Angular support should eventually recognize evidence such as:
-
-```text
-Angular source graph
-      │
-      ├── routes / lazy routes
-      ├── standalone components / NgModules
-      ├── services + dependency injection
-      ├── HttpClient calls
-      ├── guards / resolvers / interceptors
-      ├── template-to-component relationships
-      └── selected RxJS/data-flow evidence
-```
+A dedicated adapter adds semantic architecture without replacing the underlying source graph. The current Next.js, Angular, and FastAPI adapters are reference implementations of that rule.
 
 Likewise, Express support should understand registered routes and middleware; Vue support should parse SFCs; Spring support should understand controllers, services, repositories, and DI.
 
@@ -152,9 +157,9 @@ Breadth matters to ArchMesh. The implemented architecture is **language plugin +
 
 A practical next sequence is:
 
-1. add Angular semantic support on top of the JavaScript/TypeScript plugin;
-2. improve workspace/system boundaries for npm/pnpm/Yarn workspaces, Nx, Turborepo, and mixed-language services;
-3. add cross-language HTTP endpoint matching when a caller and handler both expose compatible static evidence;
+1. improve workspace/system boundaries for npm/pnpm/Yarn workspaces, Nx, Turborepo, and mixed-language services;
+2. add cross-language HTTP endpoint matching when a caller and handler both expose compatible static evidence;
+3. deepen Angular with `HttpClient`, standalone/NgModule metadata, guards/interceptors, and selected RxJS semantics;
 4. deepen Node frameworks: Express/Fastify/Hono, NestJS, React Router/Vite, Expo Router;
 5. add Django/Flask adapters and framework-native component formats such as Vue/Nuxt, Svelte/SvelteKit, Astro;
 6. add additional backend language families: Java/Kotlin, C#/.NET, Go;

@@ -9,6 +9,7 @@ export type PluginCapability =
   | 'imports'
   | 'module-resolution'
   | 'components'
+  | 'templates'
   | 'services'
   | 'routes'
   | 'api-handlers'
