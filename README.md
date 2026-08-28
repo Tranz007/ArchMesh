@@ -2,7 +2,7 @@
 
 **A local-first visual architecture explorer for modern software projects.**
 
-ArchMesh scans a codebase on your machine and turns it into an interactive map of how the system is actually put together: product areas, routes, services, APIs, data stores, integrations, source files, dependencies, failures, source changes, and architecture drift.
+ArchMesh scans a codebase on your machine and turns it into an interactive map of how the system is actually put together: product areas, routes, services, APIs, data stores, integrations, source files, dependencies, failures, source changes, architecture drift, directional data flow, and security evidence.
 
 > **See how your system connects. See when it doesn't.**
 
@@ -10,14 +10,15 @@ ArchMesh is built for developers, architects, designers, and AI coding agents wh
 
 ## Why ArchMesh
 
-Large applications are difficult to hold in your head. A shared service can affect several features. A data collection can be read in one area and written in another. A runtime error can begin in one file and affect a distant user workflow. During active development, architecture itself can change without anyone noticing a new dependency or removed route.
+Large applications are difficult to hold in your head. A shared service can affect several features. A data collection can be read in one area and written in another. A runtime error can begin in one file and affect a distant user workflow. Sensitive data can cross a system boundary without that fact being obvious from a directory tree. During active development, architecture itself can change without anyone noticing a new dependency or removed route.
 
 ArchMesh makes those relationships visible while keeping the exact scanned code graph as the evidence layer underneath higher-level views.
 
-### Views
+### Views and lenses
 
 - **Architecture** — How is the product organized?
 - **Topology** — Which features touch which data stores and external systems?
+- **Security** — Where does security-relevant data move, what boundaries does it cross, and what protections can source evidence actually prove?
 - **Changes** — What source changed, and what else depends on it?
 - **Drift** — What architecture was added, removed, or modified between live scans?
 - **Code** — What are the exact file-level dependencies?
@@ -31,9 +32,12 @@ ArchMesh is pre-1.0, but already supports a useful TypeScript/JavaScript baselin
 
 - interactive Three.js/WebGL 3D architecture graph with orbit, zoom, pan, and fit-to-view controls;
 - semantic node shapes and colors for products, features, services/APIs, routes, data, integrations, components, files, and modules;
-- Architecture Lenses for System Map, Product Areas, Data & Integrations, Routes & APIs, Change Impact, Health, Architecture Drift, and Code Structure;
+- Architecture Lenses for System Map, Product Areas, Data & Integrations, Routes & APIs, Security, Change Impact, Health, Architecture Drift, and Code Structure;
 - progressive disclosure so the default architecture view prioritizes meaningful product structure instead of opening as a file-level hairball;
-- optional directional Flow mode with animated source-to-target pulses for calls, reads, writes, and integration relationships;
+- optional directional Flow mode with small animated pulses for calls, reads, writes, and integration relationships;
+- bidirectional-looking flow when independent evidence exists in both directions between the same nodes;
+- security evidence for static sensitive payload fields, external boundaries, cleartext HTTP, TLS-requested HTTPS, and unknown protection states;
+- security-specific connection colors without replacing semantic node identity;
 - search, node inspection, selectable connections, and directional dependency inspection;
 - Architecture, Topology, Changes, Drift, and Code views;
 - feature drill-down without expanding unrelated implementation detail;
@@ -80,14 +84,14 @@ Subscription service
 
 A red connection is selectable. When evidence exists, the inspector explains why the relationship is red rather than using color without context.
 
-Health, source-control impact, and architecture drift are deliberately independent dimensions:
+Health, source-control impact, architecture drift, and security evidence are deliberately independent dimensions:
 
 ```text
-Runtime health       Git impact         Architecture drift
-error / impacted     changed / affected added / removed / modified
+Runtime health       Git impact         Architecture drift       Security evidence
+error / impacted     changed / affected added / removed / modified sensitive / cleartext / TLS requested / unknown
 ```
 
-A changed file is not automatically broken. An affected feature is not automatically failing. A removed route is not automatically a runtime error.
+A changed file is not automatically broken. An affected feature is not automatically failing. A removed route is not automatically a runtime error. A security-relevant boundary crossing is not automatically a vulnerability.
 
 ## Run ArchMesh locally
 
@@ -164,14 +168,14 @@ ArchMesh validates that the requested source path resolves inside the scanned pr
 
 ### Animate directional flow
 
-Use **Flow** in the lower-right graph controls to animate relationships that represent actual source-to-target movement.
+Use **Flow** in the lower-right graph controls to animate relationships that represent detected request or data movement.
 
 Flow intentionally animates only:
 
-- `calls` — request/execution flow;
-- `reads` — source reads from a data resource;
-- `writes` — source writes to a data resource;
-- `integrates-with` — application/integration communication.
+- `calls` — source → target request/execution flow;
+- `reads` — target → source because data moves from the resource back to the reader;
+- `writes` — source → target because data leaves the writer and enters the resource;
+- `integrates-with` — source → target integration usage based on detected evidence.
 
 Static relationships such as `contains`, `imports`, and `depends-on` are not animated as traffic.
 
@@ -179,10 +183,36 @@ When Flow is enabled:
 
 - **Focus** animates eligible incoming and outgoing relationships for the selected node, or the selected connection itself;
 - **All** animates every eligible visible relationship in the current lens/view;
-- pulse direction always follows the graph edge's `source → target` direction;
-- runtime warning/error/impact colors override the normal relation pulse color.
+- if two nodes have independent read/write or other opposite-direction relationships, pulses can visibly travel both ways;
+- runtime warning/error/impact colors override normal relation colors outside Security Lens;
+- in Security Lens, security color stays on the connection while pulses show detected movement direction.
 
-Flow is off by default so large graphs remain calm until movement is useful.
+Flow is deliberately subtle: packets and active lines are visual guidance, not a claim about packet size, throughput, request volume, or runtime frequency.
+
+See [`docs/FLOW_VISUALIZATION.md`](docs/FLOW_VISUALIZATION.md).
+
+### Inspect security evidence
+
+Choose the **Security** Architecture Lens to focus the graph on connections and resources with security-relevant evidence.
+
+The first Security Lens can detect:
+
+- statically visible sensitive payload field names such as email, phone, identifiers, credentials, and payment-related fields;
+- `http://` cleartext external transport;
+- `https://` as **TLS requested**;
+- external HTTP/HTTPS boundary crossings;
+- Firestore reads/writes and statically visible sensitive write fields;
+- same-origin, provider-SDK transport, and managed-service at-rest protection as **Unknown** when the repository cannot prove the control.
+
+ArchMesh intentionally does **not** turn “HTTPS” into a generic green “secure” claim. `TLS requested` means the code requests HTTPS; it does not prove certificate behavior, proxy configuration, negotiated protocol, or provider storage controls at runtime.
+
+Likewise, **Unknown** means ArchMesh cannot prove the control from repository evidence. It does not mean the control is absent.
+
+Only detected field names/classifications are copied into security graph metadata. ArchMesh does not copy statically visible URL credentials, query values, or fragments into graph artifacts.
+
+The Security Lens is architecture intelligence, not a replacement for SAST, DAST, dependency scanning, penetration testing, or a compliance audit.
+
+See [`docs/SECURITY_LENS.md`](docs/SECURITY_LENS.md).
 
 ### Visualize Git change impact
 
@@ -293,27 +323,27 @@ Project source
       │
       ├── module resolution
       ├── Next.js semantics
-      ├── HTTP relationships
-      ├── Firestore relationships
+      ├── HTTP relationships + transport evidence
+      ├── Firestore relationships + field evidence
       └── integration detection
       │
       ▼
  Exact code graph
       │
-      ├────────────┬────────────┬────────────┬───────────┐
-      ▼            ▼            ▼            ▼           ▼
- Architecture   Topology      Changes       Code       Drift
- projection     projection    projection    view    comparison
-      │            │            │            │           │
-      └────────────┴──────┬─────┴────────────┴───────────┘
-                          ▼
-                 lenses + state overlays
-                          │
-                          ▼
-                 Three.js/WebGL 3D viewer
-                          ▲
-                          │
-                   optional watch loop
+      ├────────────┬────────────┬────────────┬────────────┬───────────┐
+      ▼            ▼            ▼            ▼            ▼           ▼
+ Architecture   Topology      Security      Changes       Code       Drift
+ projection     projection    projection    projection    view    comparison
+      │            │            │            │            │           │
+      └────────────┴────────────┴──────┬─────┴────────────┴───────────┘
+                                      ▼
+                             lenses + state overlays
+                                      │
+                                      ▼
+                             Three.js/WebGL 3D viewer
+                                      ▲
+                                      │
+                               optional watch loop
 ```
 
 The exact code graph remains the evidence layer. Higher-level views are projections and comparisons, not replacements for the underlying relationships.
@@ -326,21 +356,24 @@ The exact code graph remains the evidence layer. Higher-level views are projecti
 
 **Evidence over inference.** Prefer an omitted relationship over a convincing fabricated one. Keep configured, detected, inferred, and unknown information distinct when it matters.
 
+**Unknown is not absent.** If source evidence cannot prove a runtime or provider security control, ArchMesh says Unknown rather than secure or insecure.
+
 **Human architecture over file hairballs.** Start with product areas and features; reveal routes, services, data, files, and source detail progressively.
 
-**Error is not impact. Change is not failure. Drift is structural.** These meanings stay separate throughout the graph and inspector.
+**Error is not impact. Change is not failure. Drift is structural. Security is independent.** These meanings stay separate throughout the graph and inspector.
 
 ## Project structure
 
 ```text
 src/
 ├── scanner/       source scanning and static semantics
-├── projections/   architecture/topology/change/drift projections
+├── projections/   architecture/topology/security/change/drift projections
+├── security/      conservative sensitive-data classification
 ├── health/        health signals and propagation
 ├── changes/       Git change-impact analysis
 ├── drift/         graph-to-graph structural comparison
 ├── editor/        safe local source-editor navigation
-├── flow           directional runtime/data-flow semantics
+├── flow           directional request/data-flow semantics
 ├── lenses         progressive architecture lens projections
 ├── build-graph    shared graph-build pipeline
 ├── watch          live filesystem rebuild pipeline
@@ -355,6 +388,8 @@ src/
 - [Graph model](docs/GRAPH_MODEL.md)
 - [Scanner](docs/SCANNER.md)
 - [Configuration](docs/CONFIGURATION.md)
+- [Flow visualization](docs/FLOW_VISUALIZATION.md)
+- [Security Lens](docs/SECURITY_LENS.md)
 - [Health and observability](docs/HEALTH_AND_OBSERVABILITY.md)
 - [Development](docs/DEVELOPMENT.md)
 - [Definition of Done](docs/DEFINITION_OF_DONE.md)
@@ -403,7 +438,7 @@ See [`docs/ROADMAP.md`](docs/ROADMAP.md) and [`docs/DEFINITION_OF_DONE.md`](docs
 
 ## What ArchMesh is not
 
-ArchMesh is not intended to be a hosted-source requirement, an AI replacement for architecture understanding, a generic observability dashboard with a graph bolted on, or a source of invented relationships.
+ArchMesh is not intended to be a hosted-source requirement, an AI replacement for architecture understanding, a generic observability dashboard with a graph bolted on, a replacement for dedicated application-security testing, or a source of invented relationships.
 
 ArchMesh is independently implemented under the MIT license.
 
