@@ -29,6 +29,28 @@ describe('architecture scenes', () => {
     expect(scenes.some((scene) => scene.seedId === 'file:other')).toBe(false);
   });
 
+  it('does not let one node kind consume the entire suggested-scene list', () => {
+    const manyIntegrations: ArchGraphData = {
+      ...graph,
+      nodes: [
+        ...graph.nodes,
+        ...Array.from({ length: 8 }, (_, index) => ({
+          id: `integration:${index}`,
+          label: `Provider ${index}`,
+          kind: 'integration' as const,
+          health: 'healthy' as const,
+        })),
+        { id: 'system:web', label: 'Web app', kind: 'system', health: 'healthy' },
+        { id: 'feature:billing', label: 'Billing', kind: 'feature', health: 'healthy' },
+        { id: 'data:accounts', label: 'Accounts', kind: 'data', health: 'healthy' },
+      ],
+    };
+
+    const scenes = deriveSceneCandidates(manyIntegrations, 9);
+    expect(scenes.filter((scene) => scene.seedKind === 'integration').length).toBeLessThanOrEqual(3);
+    expect(new Set(scenes.map((scene) => scene.seedKind)).size).toBeGreaterThan(1);
+  });
+
   it('projects a bounded neighborhood around a seed', () => {
     const seed = graph.nodes.find((node) => node.id === 'route:profile')!;
     const scene = sceneFromNode(seed, { depth: 1, direction: 'both' });
