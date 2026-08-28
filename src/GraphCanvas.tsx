@@ -281,6 +281,7 @@ export function GraphCanvas({
   const [flowEnabled, setFlowEnabled] = useState(false);
   const [flowScope, setFlowScope] = useState<FlowScope>('all');
   const fittedGraphRef = useRef<string | undefined>(undefined);
+  const previousViewportRef = useRef({ width: 1, height: 1 });
   const previousFlowSelectionRef = useRef('');
 
   useEffect(() => {
@@ -289,10 +290,13 @@ export function GraphCanvas({
 
     const updateSize = () => {
       const rect = container.getBoundingClientRect();
-      setSize({
-        width: Math.max(1, Math.floor(rect.width)),
-        height: Math.max(1, Math.floor(rect.height)),
-      });
+      const width = Math.max(1, Math.floor(rect.width));
+      const height = Math.max(1, Math.floor(rect.height));
+      setSize((current) => (
+        current.width === width && current.height === height
+          ? current
+          : { width, height }
+      ));
     };
 
     updateSize();
@@ -488,6 +492,28 @@ export function GraphCanvas({
     const timer = window.setTimeout(() => {
       if (fittedGraphRef.current !== graphIdentity) fitGraph();
     }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [graphData.nodes.length, graphIdentity, size.height, size.width]);
+
+  useEffect(() => {
+    const previous = previousViewportRef.current;
+    previousViewportRef.current = size;
+
+    if (graphData.nodes.length === 0 || size.width < 120 || size.height < 120) return undefined;
+    if (previous.width < 120 || previous.height < 120) return undefined;
+    if (previous.width === size.width && previous.height === size.height) return undefined;
+    if (fittedGraphRef.current !== graphIdentity) return undefined;
+
+    // ResizeObserver updates the canvas immediately while the perspective camera
+    // still has the old framing. Wait until the user stops dragging the browser
+    // edge, then refit once against the final viewport instead of fighting every
+    // intermediate pixel-sized resize event.
+    const timer = window.setTimeout(() => {
+      const graph = graphRef.current;
+      if (!graph) return;
+      graph.zoomToFit(300, 72);
+    }, 220);
 
     return () => window.clearTimeout(timer);
   }, [graphData.nodes.length, graphIdentity, size.height, size.width]);
