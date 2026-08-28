@@ -9,8 +9,8 @@ This document distinguishes what ArchMesh can **prove from source today** from d
 | Level | Meaning |
 | --- | --- |
 | **Deep** | ArchMesh scans the source graph and understands important framework-specific architecture such as routes, handlers, or platform semantics. |
-| **Structural** | ArchMesh scans supported source files, resolves local imports, builds dependency structure, applies generic classification, and can detect supported static HTTP/integration evidence. Framework-specific runtime semantics may be missing. |
-| **Partial** | ArchMesh can scan JavaScript/TypeScript portions of the repository, but important framework-native files or boundaries are not parsed yet. |
+| **Structural** | ArchMesh scans the primary source language, resolves supported local dependencies/imports, builds useful structure, and applies tested generic semantics. Framework-specific runtime semantics may be missing. |
+| **Partial** | ArchMesh can scan some useful source in the repository, but important language/framework-native files or boundaries are not parsed yet. |
 | **Planned** | The primary source language or framework file format is not currently scanned. |
 
 A support level describes ArchMesh's evidence coverage. It does **not** mean ArchMesh can prove every runtime relationship in that stack.
@@ -28,12 +28,13 @@ A support level describes ArchMesh's evidence coverage. It does **not** mean Arc
 | **Angular** | **Structural** | TypeScript graph, components/services by convention, local imports, TS aliases, supported integrations | Angular Router, modules/standalone metadata, DI, templates, signals/RxJS flow, `HttpClient` semantics |
 | **React Native / Expo** | **Structural** | TS/JS dependency graph, components, services, static `fetch()`, supported integrations | Expo Router/navigation, native modules, platform boundaries, app configuration semantics |
 | **Electron** | **Structural** | TS/JS graph across main/renderer source when inside the scanned root | IPC, preload/context bridge, process boundaries are not modeled yet |
-| **npm / pnpm / Yarn monorepos** | **Partial** | Source under the selected root is walked; TS/JS imports and configured aliases can resolve inside that root | Workspace/package boundaries, package-to-package architecture, aliases outside the scan root |
-| **Turborepo / Nx** | **Partial** | Underlying TS/JS source can be scanned | Workspace/project graph and task graph semantics are not imported yet |
+| **Python services / libraries** | **Structural** | `.py` source graph, absolute and relative package imports, root and `src/` layouts, module/service/data classification, selected integration imports | Dynamic imports, Python call graph, packaging/workspace semantics, framework-specific runtime meaning |
+| **FastAPI / Django / Flask** | **Structural** | Underlying Python source/import graph and generic structure | Routes, decorators, dependency injection, middleware, ORM/framework data semantics need dedicated adapters |
+| **npm / pnpm / Yarn monorepos** | **Partial** | Supported JS/TS/Python source under the selected root is walked and merged | Workspace/package boundaries, package-to-package architecture, aliases outside the scan root |
+| **Turborepo / Nx** | **Partial** | Underlying supported source can be scanned | Workspace/project graph and task graph semantics are not imported yet |
 | **Vue / Nuxt** | **Partial** | Standalone `.ts` / `.js` source is scanned | `.vue` single-file components and Nuxt routing/server semantics are not parsed yet |
 | **Svelte / SvelteKit** | **Partial** | Standalone `.ts` / `.js` source is scanned | `.svelte` components and SvelteKit routing/server semantics are not parsed yet |
 | **Astro** | **Partial** | Standalone `.ts` / `.js` source is scanned | `.astro` files, islands, and Astro routing semantics are not parsed yet |
-| **Python / Django / FastAPI / Flask** | **Planned** | — | Python parser/import graph and framework adapters |
 | **Java / Spring** | **Planned** | — | Java parser/import graph, Spring controllers/services/DI/data semantics |
 | **Kotlin / Spring** | **Planned** | — | Kotlin parser/import graph and Spring semantics |
 | **C# / .NET / ASP.NET Core** | **Planned** | — | C# parser/project graph, controllers/minimal APIs, DI/data semantics |
@@ -46,22 +47,25 @@ A support level describes ArchMesh's evidence coverage. It does **not** mean Arc
 
 ArchMesh currently treats these as first-class source files:
 
-| Extension | Status |
-| --- | --- |
-| `.ts` | Supported |
-| `.tsx` | Supported |
-| `.js` | Supported |
-| `.jsx` | Supported |
-| `.mjs` | Supported |
-| `.cjs` | Supported |
+| Extension | Language plugin | Status |
+| --- | --- | --- |
+| `.ts` | JavaScript / TypeScript | Supported |
+| `.tsx` | JavaScript / TypeScript | Supported |
+| `.js` | JavaScript / TypeScript | Supported |
+| `.jsx` | JavaScript / TypeScript | Supported |
+| `.mjs` | JavaScript / TypeScript | Supported |
+| `.cjs` | JavaScript / TypeScript | Supported |
+| `.py` | Python | Supported |
 
-Files such as `.vue`, `.svelte`, `.astro`, `.py`, `.java`, `.kt`, `.cs`, `.go`, `.rs`, `.rb`, and `.php` are not parsed as source nodes yet.
+Files such as `.vue`, `.svelte`, `.astro`, `.java`, `.kt`, `.cs`, `.go`, `.rs`, `.rb`, and `.php` are not parsed as source nodes yet.
 
 Configuration files such as `tsconfig.json`, `jsconfig.json`, and `archmesh.config.json` can influence scanning even though they are not represented as ordinary source nodes.
 
-## Cross-framework capabilities
+## Language-plugin capabilities today
 
-For supported JavaScript/TypeScript source, the following capabilities do not depend on Next.js:
+### JavaScript / TypeScript
+
+The built-in JavaScript/TypeScript plugin provides:
 
 - recursive source discovery inside the selected project root;
 - static `import`, `export`, and dynamic-import discovery;
@@ -71,14 +75,40 @@ For supported JavaScript/TypeScript source, the following capabilities do not de
 - static `fetch()` discovery;
 - external HTTP host discovery;
 - security evidence on statically inspectable `fetch()` payload fields;
-- selected integration package detection;
-- Git change-impact overlays;
-- TypeScript diagnostics;
-- health-signal ingestion;
-- architecture drift between live scans;
-- lenses, Flow, Trace, search, inspection, and editor navigation over whatever graph evidence was detected.
+- selected integration package detection.
 
-That is why a React, Angular, Node, NestJS, Expo, or Electron repository can already produce a useful ArchMesh graph even before it has a dedicated framework adapter.
+The Next.js adapter adds App Router semantics on top of that language graph.
+
+### Python
+
+The built-in Python plugin uses a real Python syntax grammar and provides:
+
+- recursive `.py` discovery while excluding common virtualenv/cache/build directories;
+- absolute package import discovery;
+- relative package import discovery;
+- local module resolution for root and common `src/` project layouts;
+- stable source identity for files and package `__init__.py` modules;
+- generic module/service/data classification by convention;
+- lightweight class/function-count evidence;
+- selected integration-package detection;
+- mixed-language graph merging with the JavaScript/TypeScript plugin.
+
+It deliberately does **not** infer FastAPI, Django, or Flask routes from filenames. Those semantics belong in framework adapters.
+
+## Capabilities shared after scanning
+
+Once a language plugin contributes graph evidence, the rest of ArchMesh remains language-agnostic. Supported graph evidence can participate in:
+
+- Git change-impact overlays;
+- generic health-signal ingestion;
+- architecture drift between live scans;
+- lenses and progressive disclosure;
+- Flow when a relationship has directional flow semantics;
+- Trace investigation;
+- search and inspection;
+- source editor navigation when the node has a local path.
+
+A mixed repository can activate multiple language plugins in one scan. For example, TypeScript frontend files and Python backend files can coexist in the same `ArchGraphData` graph. Cross-language runtime endpoint matching is a separate semantic layer and should be added only when both sides provide defensible evidence.
 
 ## What deeper framework support means
 
@@ -98,19 +128,22 @@ Angular source graph
       └── selected RxJS/data-flow evidence
 ```
 
+A FastAPI adapter should similarly recognize route decorators, methods/paths, router inclusion, dependency injection, and request-facing handlers without putting those rules into the Python language parser.
+
 Likewise, Express support should understand registered routes and middleware; Vue support should parse SFCs; Spring support should understand controllers, services, repositories, and DI.
 
 ## Expansion priority
 
-Breadth matters to ArchMesh. The long-term architecture should be **language parser + framework adapters + shared graph model**, rather than one scanner accumulating framework-specific special cases.
+Breadth matters to ArchMesh. The implemented architecture is **language plugin + framework adapters + shared graph model** rather than one scanner accumulating framework-specific special cases.
 
-A practical expansion sequence is:
+A practical next sequence is:
 
-1. deepen the JavaScript/TypeScript ecosystem: Angular, Express/Fastify/Hono, NestJS, React Router/Vite, Expo Router;
-2. add framework-native component formats: Vue/Nuxt, Svelte/SvelteKit, Astro;
-3. improve workspace/monorepo semantics: npm/pnpm/Yarn workspaces, Nx, Turborepo;
-4. add major backend language families: Python, Java/Kotlin, C#/.NET, Go;
-5. extend into additional ecosystems based on representative repositories and contributor demand.
+1. deepen the new Python graph with a FastAPI adapter, followed by Django/Flask based on representative demand;
+2. deepen the JavaScript/TypeScript ecosystem: Angular, Express/Fastify/Hono, NestJS, React Router/Vite, Expo Router;
+3. improve workspace/system boundaries: npm/pnpm/Yarn workspaces, Nx, Turborepo, mixed-language services;
+4. add framework-native component formats: Vue/Nuxt, Svelte/SvelteKit, Astro;
+5. add additional backend language families: Java/Kotlin, C#/.NET, Go;
+6. extend into additional ecosystems based on representative repositories and contributor demand.
 
 This ordering is not a promise of release dates. Support should be promoted only when representative fixtures and tests prove the claimed behavior.
 
