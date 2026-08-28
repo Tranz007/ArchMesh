@@ -45,16 +45,17 @@ export function sceneFromNode(
   node: ArchNode,
   options: Partial<Pick<ArchitectureScene, 'name' | 'direction' | 'depth' | 'source'>> = {},
 ): ArchitectureScene {
+  const source = options.source ?? 'detected';
   const now = new Date().toISOString();
   return {
-    id: `scene:${node.id}`,
+    id: source === 'saved' ? `saved:${node.id}:${Date.now()}` : `scene:${node.id}`,
     name: options.name ?? sceneName(node),
     seedId: node.id,
     seedKind: node.kind,
     direction: options.direction ?? 'both',
     depth: Math.max(1, Math.min(4, options.depth ?? 2)),
-    source: options.source ?? 'detected',
-    ...(options.source === 'saved' ? { createdAt: now, updatedAt: now } : {}),
+    source,
+    ...(source === 'saved' ? { createdAt: now, updatedAt: now } : {}),
   };
 }
 
