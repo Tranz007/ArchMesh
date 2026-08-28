@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { linkStaticHttpEndpoints } from '../linkers/http-endpoints.js';
 import { applySystemBoundaries } from '../system/boundaries.js';
 import { mergeGraphContributions, mergeLanguageGraphs } from './merge.js';
 import { builtInFrameworkAdapters, builtInLanguagePlugins } from './registry.js';
@@ -78,8 +79,14 @@ export async function scanProjectWithPlugins(
     frameworkCapabilities: capabilitiesOf(appliedFrameworkAdapters).join(', '),
   };
 
-  // System/workspace boundaries are deliberately applied after language and
-  // framework enrichment so semantic route/API nodes inherit the same source
-  // path and can participate in the same app/service boundary as their file.
-  return applySystemBoundaries(root, graph);
+  // Boundaries are applied before graph linkers so link evidence can say
+  // whether a statically matched request crosses an app/service boundary.
+  graph = await applySystemBoundaries(root, graph);
+
+  // Linkers run after all language/framework semantics exist. They may connect
+  // evidence produced by different plugins, but they never fabricate a target
+  // when method/path matching is ambiguous.
+  graph = mergeGraphContributions(graph, [await linkStaticHttpEndpoints(root, graph)]);
+
+  return graph;
 }
