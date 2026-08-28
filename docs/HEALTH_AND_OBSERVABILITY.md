@@ -20,6 +20,14 @@ impacted blast radius
 Architecture / Topology / Code views
 ```
 
+## Capability availability
+
+A normal local source scan does **not** mean ArchMesh is connected to live runtime telemetry. The viewer surfaces the Health lens only when the graph is backed by direct health evidence or an explicitly enabled local health adapter, such as TypeScript diagnostics or a health-signal file.
+
+The graph records capability metadata including whether health is available and how many signals/sources were applied. When no health evidence exists, ArchMesh hides the Health lens and health-specific controls rather than presenting an apparently functional view that cannot materially change the graph.
+
+The animated Flow overlay is also not a health or traffic signal. Flow derived from source relationships is illustrative directionality. It must not be interpreted as request volume, latency, runtime success, or realtime activity.
+
 ## Health states
 
 ### `healthy`
@@ -156,6 +164,17 @@ healthSignalId
 ```
 
 This lets the inspector answer “why is this red?” without confusing propagated impact with direct evidence.
+
+The root graph also records availability metadata such as:
+
+```text
+healthAvailable
+healthSignalCount
+healthSourceCount
+healthSources
+```
+
+These values describe evidence attached to the current local graph. They do not imply a persistent monitoring connection.
 
 ## Propagation rules
 
