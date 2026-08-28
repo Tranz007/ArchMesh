@@ -1,6 +1,7 @@
 import type { ArchEdge } from './types';
 
 export type FlowScope = 'focus' | 'all';
+export type FlowDirection = 'source-to-target' | 'target-to-source' | 'both' | 'unknown';
 
 const directionalFlowRelations = new Set<ArchEdge['relation']>([
   'calls',
@@ -8,10 +9,6 @@ const directionalFlowRelations = new Set<ArchEdge['relation']>([
   'writes',
   'integrates-with',
 ]);
-
-export function isDirectionalFlowRelation(relation: ArchEdge['relation']) {
-  return directionalFlowRelations.has(relation);
-}
 
 export interface FlowSelection {
   enabled: boolean;
@@ -25,10 +22,46 @@ export interface FlowEdgeLike {
   source: string;
   target: string;
   relation: ArchEdge['relation'];
+  flowDirection?: FlowDirection;
+}
+
+export function flowDirectionForEdge(edge: Pick<FlowEdgeLike, 'relation' | 'flowDirection'>): FlowDirection {
+  if (edge.relation === 'reads') return 'target-to-source';
+  if (edge.relation === 'calls' || edge.relation === 'writes') return 'source-to-target';
+  if (edge.relation === 'integrates-with') return edge.flowDirection ?? 'unknown';
+  return 'unknown';
+}
+
+export function mergeFlowDirection(
+  left?: FlowDirection,
+  right?: FlowDirection,
+): FlowDirection | undefined {
+  if (!left) return right;
+  if (!right) return left;
+  if (left === right) return left;
+  if (left === 'both' || right === 'both') return 'both';
+  if (left === 'unknown') return right;
+  if (right === 'unknown') return left;
+  return 'both';
+}
+
+export function flowDirectionFromReadWrite(hasRead: boolean, hasWrite: boolean): FlowDirection | undefined {
+  if (hasRead && hasWrite) return 'both';
+  if (hasRead) return 'target-to-source';
+  if (hasWrite) return 'source-to-target';
+  return undefined;
+}
+
+export function isDirectionalFlowRelation(relation: ArchEdge['relation']) {
+  return directionalFlowRelations.has(relation);
+}
+
+export function hasDirectionalFlowEvidence(edge: Pick<FlowEdgeLike, 'relation' | 'flowDirection'>) {
+  return isDirectionalFlowRelation(edge.relation) && flowDirectionForEdge(edge) !== 'unknown';
 }
 
 export function shouldAnimateFlowEdge(edge: FlowEdgeLike, selection: FlowSelection) {
-  if (!selection.enabled || !isDirectionalFlowRelation(edge.relation)) return false;
+  if (!selection.enabled || !hasDirectionalFlowEvidence(edge)) return false;
   if (selection.scope === 'all') return true;
   if (selection.selectedEdgeId) return edge.id === selection.selectedEdgeId;
   if (selection.selectedNodeId) {
@@ -38,16 +71,20 @@ export function shouldAnimateFlowEdge(edge: FlowEdgeLike, selection: FlowSelecti
 }
 
 /**
- * The graph renderer only documents particle travel from its rendered source to
- * rendered target. ArchMesh stores a read as "reader reads resource", while the
- * data itself moves resource -> reader. Swap only the render endpoints so the
- * evidence model remains unchanged and the renderer can use a normal positive
- * particle speed.
+ * The graph renderer documents particle travel from rendered source to rendered
+ * target. ArchMesh keeps evidence orientation separate from data-flow
+ * orientation: reads are stored as "reader reads resource", and an integration
+ * can carry explicit source/target direction evidence.
  */
-export function flowRenderEndpoints(edge: Pick<FlowEdgeLike, 'source' | 'target' | 'relation'>) {
-  return edge.relation === 'reads'
+export function flowRenderEndpoints(edge: Pick<FlowEdgeLike, 'source' | 'target' | 'relation' | 'flowDirection'>) {
+  const direction = flowDirectionForEdge(edge);
+  return direction === 'target-to-source'
     ? { source: edge.target, target: edge.source }
     : { source: edge.source, target: edge.target };
+}
+
+export function hasReverseFlow(edge: Pick<FlowEdgeLike, 'relation' | 'flowDirection'>) {
+  return flowDirectionForEdge(edge) === 'both';
 }
 
 export function flowParticleSpeed(relation: ArchEdge['relation']) {
@@ -58,8 +95,15 @@ export function flowParticleSpeed(relation: ArchEdge['relation']) {
   return 0;
 }
 
-export function flowDirectionLabel(relation: ArchEdge['relation']) {
-  return relation === 'reads' ? 'target → source' : 'source → target';
+export function flowDirectionLabel(
+  relation: ArchEdge['relation'],
+  flowDirection?: FlowDirection,
+) {
+  const direction = flowDirectionForEdge({ relation, flowDirection });
+  if (direction === 'both') return 'source ↔ target';
+  if (direction === 'target-to-source') return 'target → source';
+  if (direction === 'source-to-target') return 'source → target';
+  return 'direction unknown';
 }
 
 function relationDelayMultiplier(relation: ArchEdge['relation']) {
