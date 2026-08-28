@@ -4,6 +4,7 @@ export type DriftState = 'stable' | 'added' | 'removed' | 'modified';
 
 export type NodeKind =
   | 'product'
+  | 'system'
   | 'feature'
   | 'route'
   | 'component'
