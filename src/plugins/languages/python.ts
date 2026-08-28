@@ -1,3 +1,4 @@
+import type { Dirent } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { SyntaxNode } from '@lezer/common';
@@ -60,7 +61,7 @@ function classifyPythonFile(relativePath: string): NodeKind {
 }
 
 async function walkPython(dir: string, files: string[]) {
-  let entries: fs.Dirent[];
+  let entries: Dirent[];
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
   } catch {
