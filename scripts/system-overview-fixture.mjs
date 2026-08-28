@@ -1,18 +1,25 @@
 import fs from 'node:fs/promises';
 
-const featureCount = 26;
-const integrationCount = 12;
+const systemCount = 12;
+const integrationCount = 27;
 const nodes = [];
 const edges = [];
 
-for (let index = 0; index < featureCount; index += 1) {
+for (let index = 0; index < systemCount; index += 1) {
   nodes.push({
-    id: `file:area-${index}.ts`,
-    label: `Area ${index}`,
+    id: `service:system-${index}`,
+    label: `System ${index} Service`,
     kind: 'service',
-    path: `features/area-${index}/service.ts`,
+    path: `apps/system-${index}/service.ts`,
     health: 'healthy',
     change: 'unchanged',
+    metadata: {
+      systemKey: `system-${index}`,
+      systemLabel: `System ${index}`,
+      systemType: 'application',
+      systemRoot: `apps/system-${index}`,
+      systemSource: 'workspace',
+    },
   });
 }
 
@@ -28,14 +35,15 @@ for (let index = 0; index < integrationCount; index += 1) {
 
 let edgeNumber = 1;
 
-// Deliberately dense but generic feature topology. This is synthetic CI data,
-// not modeled after any real repository.
-for (let index = 0; index < featureCount; index += 1) {
-  for (const offset of [1, 4, 7]) {
+// Deliberately dense but generic detected-system topology. This forces the same
+// system-boundary projection path used by multi-system repositories rather than
+// the feature-overview fallback.
+for (let index = 0; index < systemCount; index += 1) {
+  for (const offset of [1, 3, 5]) {
     edges.push({
       id: `edge:${edgeNumber++}`,
-      source: `file:area-${index}.ts`,
-      target: `file:area-${(index + offset) % featureCount}.ts`,
+      source: `service:system-${index}`,
+      target: `service:system-${(index + offset) % systemCount}`,
       relation: 'imports',
       health: 'healthy',
       change: 'unchanged',
@@ -43,12 +51,12 @@ for (let index = 0; index < featureCount; index += 1) {
   }
 }
 
-for (let index = 0; index < featureCount; index += 1) {
-  for (const providerOffset of [0, 5]) {
+for (let index = 0; index < systemCount; index += 1) {
+  for (const providerOffset of [0, 9, 18]) {
     const provider = (index + providerOffset) % integrationCount;
     edges.push({
       id: `edge:${edgeNumber++}`,
-      source: `file:area-${index}.ts`,
+      source: `service:system-${index}`,
       target: `integration:provider-${provider}`,
       relation: 'integrates-with',
       health: 'healthy',
@@ -59,11 +67,11 @@ for (let index = 0; index < featureCount; index += 1) {
 }
 
 const graph = {
-  project: 'System Overview Fixture',
+  project: 'System Boundary Fixture',
   generatedAt: new Date().toISOString(),
   nodes,
   edges,
-  metadata: { fixture: 'system-overview-39-dense' },
+  metadata: { fixture: 'system-boundary-39-dense' },
 };
 
 await fs.mkdir('public', { recursive: true });

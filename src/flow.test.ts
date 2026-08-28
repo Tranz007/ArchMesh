@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  canAnimateFlowDirection,
   flowDirectionLabel,
   flowEmissionDelay,
   flowParticleSpeed,
@@ -63,18 +64,20 @@ describe('directional flow', () => {
     expect(shouldAnimateFlowEdge({ ...callEdge, id: 'edge:other' }, selection)).toBe(false);
   });
 
-  it('renders read data resource-to-reader without relying on negative speed', () => {
+  it('keeps reverse flow evidence out of force-layout endpoints', () => {
     const read = { ...callEdge, relation: 'reads' as const };
-    expect(flowRenderEndpoints(read)).toEqual({ source: 'node:b', target: 'node:a' });
+    expect(flowRenderEndpoints(read)).toEqual({ source: 'node:a', target: 'node:b' });
     expect(flowParticleSpeed('reads')).toBeGreaterThan(0);
     expect(flowDirectionLabel('reads')).toBe('target → source');
+    expect(canAnimateFlowDirection(read)).toBe(false);
+    expect(shouldAnimateFlowEdge(read, { enabled: true, scope: 'all' })).toBe(false);
     expect(flowRenderEndpoints({ ...callEdge, relation: 'writes' as const })).toEqual({
       source: 'node:a',
       target: 'node:b',
     });
   });
 
-  it('keeps bidirectional integration evidence explicit without materializing a second force link', () => {
+  it('keeps bidirectional integration evidence explicit without materializing or animating a second force link', () => {
     expect(mergeFlowDirection('source-to-target', 'target-to-source')).toBe('both');
     expect(withMergedFlowDirection(
       { flowDirection: 'source-to-target', securityTransport: 'unknown' },
@@ -90,6 +93,8 @@ describe('directional flow', () => {
       flowDirection: 'both' as const,
     };
     expect(hasReverseFlow(integration)).toBe(false);
+    expect(canAnimateFlowDirection(integration)).toBe(false);
+    expect(shouldAnimateFlowEdge(integration, { enabled: true, scope: 'all' })).toBe(false);
     expect(flowDirectionLabel('integrates-with', 'both')).toBe('source ↔ target');
   });
 
