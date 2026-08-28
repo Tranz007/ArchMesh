@@ -6,6 +6,7 @@ interface JourneyPanelProps {
   activeIndex?: number;
   playing: boolean;
   recording: boolean;
+  notice?: string;
   onPlay: () => void;
   onStop: () => void;
   onRecord: () => void;
@@ -18,6 +19,7 @@ export function JourneyPanel({
   activeIndex,
   playing,
   recording,
+  notice,
   onPlay,
   onStop,
   onRecord,
@@ -80,6 +82,7 @@ export function JourneyPanel({
               Clear
             </button>
           </div>
+          {notice && <p className="journey-notice">{notice}</p>}
         </>
       )}
     </section>
