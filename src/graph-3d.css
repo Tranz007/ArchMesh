@@ -102,6 +102,13 @@
   transform: rotate(45deg);
 }
 
+.legend-kind.system {
+  width: 9px;
+  height: 7px;
+  background: #8aa2d3;
+  border-radius: 2px;
+}
+
 .legend-kind.feature {
   background: #6f95d8;
   border-radius: 50%;
