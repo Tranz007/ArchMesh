@@ -31,9 +31,21 @@ export async function buildGraph(options: CliOptions): Promise<BuildGraphResult>
     ? collectTypeScriptHealthSignals(options.target)
     : [];
   const signals = [...fileSignals, ...diagnosticSignals];
+  const applied = applyHealthSignals(changedGraph, signals);
+  const healthAvailable = options.diagnostics || Boolean(options.healthPath) || fileSignals.length > 0;
+  const healthSources = new Set(signals.map((signal) => signal.source));
 
   return {
-    graph: applyHealthSignals(changedGraph, signals),
+    graph: {
+      ...applied,
+      metadata: {
+        ...(applied.metadata ?? {}),
+        healthAvailable,
+        healthSignalCount: signals.length,
+        healthSourceCount: healthSources.size,
+        healthSources: [...healthSources].sort().join(', '),
+      },
+    },
     changedPaths,
     signals,
   };
