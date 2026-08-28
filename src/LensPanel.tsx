@@ -9,13 +9,10 @@ import {
   Route,
   ShieldCheck,
 } from 'lucide-react';
-import { summarizeGraph } from './graph-summary';
 import type { ArchitectureLens } from './lenses';
-import type { ArchGraphData } from './types';
 
 interface LensPanelProps {
   activeLens: ArchitectureLens;
-  data: ArchGraphData;
   hiddenNodes?: number;
   onSelect: (lens: ArchitectureLens) => void;
 }
@@ -82,32 +79,9 @@ const lenses: Array<{
   },
 ];
 
-export function LensPanel({ activeLens, data, hiddenNodes = 0, onSelect }: LensPanelProps) {
-  const summary = summarizeGraph(data);
-  const architectureFacts = [
-    summary.routes > 0 ? `${summary.routes} route${summary.routes === 1 ? '' : 's'}` : '',
-    summary.apis > 0 ? `${summary.apis} ${summary.apis === 1 ? 'API' : 'APIs'}` : '',
-    summary.dataStores > 0 ? `${summary.dataStores} data store${summary.dataStores === 1 ? '' : 's'}` : '',
-    summary.integrations.length > 0 ? `${summary.integrations.length} integration${summary.integrations.length === 1 ? '' : 's'}` : '',
-  ].filter(Boolean);
-
+export function LensPanel({ activeLens, hiddenNodes = 0, onSelect }: LensPanelProps) {
   return (
     <div className="lens-panel">
-      <section className="detected-overview" aria-label="Detected codebase overview">
-        <div className="eyebrow">Detected in this codebase</div>
-        <strong>{summary.technologies.length > 0 ? summary.technologies.join(' + ') : 'Supported source structure'}</strong>
-        {architectureFacts.length > 0 && <p>{architectureFacts.join(' · ')}</p>}
-        {summary.integrations.length > 0 && (
-          <small>{summary.integrations.slice(0, 4).join(', ')}{summary.integrations.length > 4 ? ` +${summary.integrations.length - 4} more` : ''}</small>
-        )}
-        {(summary.securityFindings > 0 || summary.sensitiveFlows > 0) && (
-          <div className="detected-security">
-            {summary.securityFindings > 0 && <span>{summary.securityFindings} security finding{summary.securityFindings === 1 ? '' : 's'}</span>}
-            {summary.sensitiveFlows > 0 && <span>{summary.sensitiveFlows} sensitive flow{summary.sensitiveFlows === 1 ? '' : 's'}</span>}
-          </div>
-        )}
-      </section>
-
       <div className="lens-panel-heading">
         <div className="eyebrow">Architecture lenses</div>
         <h2>How do you want to see this system?</h2>
