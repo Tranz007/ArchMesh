@@ -47,17 +47,30 @@ function SceneCard({
 }
 
 export function ScenePanel({ candidates, saved, activeSceneId, onOpen, onDelete }: ScenePanelProps) {
+  const activeScene = [...saved, ...candidates].find((scene) => scene.id === activeSceneId);
+
   return (
     <section className="scene-panel" aria-label="Focused architecture views">
-      <div className="scene-panel-heading">
-        <div className="eyebrow">Focus</div>
-        <h2>What part do you want to understand?</h2>
-        <p>Scenes isolate a bounded part of the scanned architecture without changing the underlying evidence.</p>
+      <div className={`scene-panel-heading${activeScene ? ' active' : ''}`}>
+        <div className="eyebrow">{activeScene ? 'Focused scene' : 'Focus'}</div>
+        <h2>{activeScene ? activeScene.name : 'What part do you want to understand?'}</h2>
+        <p>
+          {activeScene
+            ? 'The graph is now limited to this architectural neighborhood. Use the focus bar above to change depth or direction, select a node to investigate it, or choose Back to return to the full graph.'
+            : 'Scenes isolate a bounded part of the scanned architecture without changing the underlying evidence.'}
+        </p>
+        {activeScene && (
+          <div className="scene-active-summary" aria-label="Active scene settings">
+            <span>{activeScene.seedKind}</span>
+            <span>{activeScene.depth} hops</span>
+            <span>{activeScene.direction}</span>
+          </div>
+        )}
       </div>
 
       {saved.length > 0 && (
         <div className="scene-section">
-          <h3><Bookmark size={13} /> Saved views <span>{saved.length}</span></h3>
+          <h3><Bookmark size={13} /> {activeScene ? 'Switch saved view' : 'Saved views'} <span>{saved.length}</span></h3>
           <div className="scene-list">
             {saved.map((scene) => (
               <SceneCard
@@ -74,7 +87,7 @@ export function ScenePanel({ candidates, saved, activeSceneId, onOpen, onDelete 
       )}
 
       <div className="scene-section">
-        <h3><Focus size={13} /> Detected scenes <span>{candidates.length}</span></h3>
+        <h3><Focus size={13} /> {activeScene ? 'Switch detected scene' : 'Detected scenes'} <span>{candidates.length}</span></h3>
         <div className="scene-list">
           {candidates.length === 0 && <p className="muted">No strong scene seeds were detected in this projection.</p>}
           {candidates.map((scene) => (
