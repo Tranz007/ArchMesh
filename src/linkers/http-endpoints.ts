@@ -1,10 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
+import { collectAngularHttpCalls } from '../plugins/frameworks/angular-http.js';
+import type { GraphContribution } from '../plugins/types.js';
 import { collectHttpCalls, type HttpCall } from '../scanner/semantics.js';
 import { httpSecurityMetadata } from '../security/http.js';
 import type { ArchEdge, ArchGraphData, ArchNode } from '../types.js';
-import type { GraphContribution } from '../plugins/types.js';
 
 const JAVASCRIPT_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 
@@ -12,6 +13,11 @@ interface EndpointCandidate {
   node: ArchNode;
   method: string;
   routePath: string;
+}
+
+interface CollectedCall {
+  call: HttpCall;
+  evidence: 'fetch' | 'angular-httpclient';
 }
 
 function scriptKindFor(file: string) {
@@ -107,6 +113,19 @@ function inferredLanguage(node: ArchNode) {
   return 'unknown';
 }
 
+function collectSourceHttpCalls(sourceFile: ts.SourceFile): CollectedCall[] {
+  const collected: CollectedCall[] = [
+    ...collectHttpCalls(sourceFile).map((call) => ({ call, evidence: 'fetch' as const })),
+    ...collectAngularHttpCalls(sourceFile).map((call) => ({ call, evidence: 'angular-httpclient' as const })),
+  ];
+  const unique = new Map<string, CollectedCall>();
+  for (const item of collected) {
+    const key = `${item.call.method}:${item.call.url}:${item.call.bodyFields.join(',')}`;
+    if (!unique.has(key) || item.evidence === 'angular-httpclient') unique.set(key, item);
+  }
+  return [...unique.values()];
+}
+
 export async function linkStaticHttpEndpoints(rootInput: string, graph: ArchGraphData): Promise<GraphContribution> {
   const root = path.resolve(rootInput);
   const candidates = endpointCandidates(graph);
@@ -120,7 +139,7 @@ export async function linkStaticHttpEndpoints(rootInput: string, graph: ArchGrap
     const parsed = await sourceFile(root, node);
     if (!parsed) continue;
 
-    for (const call of collectHttpCalls(parsed)) {
+    for (const { call, evidence } of collectSourceHttpCalls(parsed)) {
       const requestPath = normalizePath(call.url);
       if (!requestPath || alreadyResolved(graph, node.id, call)) continue;
       const endpoint = uniqueEndpointForCall(call, candidates);
@@ -147,6 +166,7 @@ export async function linkStaticHttpEndpoints(rootInput: string, graph: ArchGrap
         metadata: {
           ...httpSecurityMetadata(call),
           endpointMatch: 'static-method-path',
+          callerEvidence: evidence,
           matchedRoutePath: endpoint.routePath,
           matchedFramework: metadataString(endpoint.node, 'framework') ?? 'unknown',
           sourceLanguage,
@@ -163,6 +183,7 @@ export async function linkStaticHttpEndpoints(rootInput: string, graph: ArchGrap
     edges,
     metadata: {
       staticEndpointMatchCount: edges.length,
+      angularHttpClientEndpointMatchCount: edges.filter((edge) => edge.metadata?.callerEvidence === 'angular-httpclient').length,
       crossLanguageEndpointMatchCount: edges.filter((edge) => edge.metadata?.crossLanguage === true).length,
       crossSystemEndpointMatchCount: edges.filter((edge) => edge.metadata?.crossSystem === true).length,
     },
