@@ -21,6 +21,7 @@ import { GraphCanvas } from './GraphCanvas';
 import { LensPanel } from './LensPanel';
 import { SecurityEvidence } from './SecurityEvidence';
 import { SourceOpenAction } from './SourceOpenAction';
+import { TraceBar } from './TraceBar';
 import {
   projectHealthContext,
   projectProductAreas,
@@ -33,6 +34,7 @@ import { projectChanges } from './projections/changes';
 import { projectDrift } from './projections/drift';
 import { projectSecurity } from './projections/security';
 import { projectTopology } from './projections/topology';
+import { projectTrace, type TraceDirection } from './projections/trace';
 import { sampleGraph } from './sample-graph';
 import type {
   ArchEdge,
@@ -169,6 +171,8 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('architecture');
   const [activeLens, setActiveLens] = useState<ArchitectureLens>('system');
   const [focusedFeatureId, setFocusedFeatureId] = useState<string>();
+  const [traceRootId, setTraceRootId] = useState<string>();
+  const [traceDirection, setTraceDirection] = useState<TraceDirection>('both');
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>();
   const [errorsOnly, setErrorsOnly] = useState(false);
@@ -235,7 +239,7 @@ export default function App() {
     [architectureProjection.graph],
   );
 
-  const visibleData = useMemo(() => {
+  const baseVisibleData = useMemo(() => {
     if (source === 'demo') return data;
     if (focusedFeatureId && viewMode === 'architecture' && activeLens !== 'security') return architectureProjection.graph;
     if (activeLens === 'system') return systemProjection;
@@ -264,6 +268,15 @@ export default function App() {
     viewMode,
   ]);
 
+  const traceProjection = useMemo(
+    () => traceRootId
+      ? projectTrace(baseVisibleData, { rootId: traceRootId, direction: traceDirection })
+      : undefined,
+    [baseVisibleData, traceDirection, traceRootId],
+  );
+
+  const visibleData = traceProjection ?? baseVisibleData;
+
   const selectNode = useCallback((nodeId?: string) => {
     setSelectedEdgeId(undefined);
     setSelectedNodeId(nodeId);
@@ -279,14 +292,40 @@ export default function App() {
     setSelectedEdgeId(undefined);
   }, []);
 
+  const clearTrace = useCallback(() => {
+    setTraceRootId(undefined);
+    setTraceDirection('both');
+  }, []);
+
+  const beginTrace = useCallback((nodeId: string) => {
+    setTraceRootId(nodeId);
+    setTraceDirection('both');
+    setSelectedEdgeId(undefined);
+    setSelectedNodeId(nodeId);
+    setErrorsOnly(false);
+  }, []);
+
+  const exitTrace = useCallback(() => {
+    const rootId = traceRootId;
+    clearTrace();
+    setSelectedEdgeId(undefined);
+    setSelectedNodeId(rootId);
+  }, [clearTrace, traceRootId]);
+
+  useEffect(() => {
+    if (traceRootId && !baseVisibleData.nodes.some((node) => node.id === traceRootId)) {
+      clearTrace();
+    }
+  }, [baseVisibleData.nodes, clearTrace, traceRootId]);
+
   useEffect(() => {
     if (selectedNodeId && !visibleData.nodes.some((node) => node.id === selectedNodeId)) {
-      setSelectedNodeId(undefined);
+      setSelectedNodeId(traceRootId && visibleData.nodes.some((node) => node.id === traceRootId) ? traceRootId : undefined);
     }
     if (selectedEdgeId && !visibleData.edges.some((edge) => edge.id === selectedEdgeId)) {
       setSelectedEdgeId(undefined);
     }
-  }, [selectedEdgeId, selectedNodeId, visibleData.edges, visibleData.nodes]);
+  }, [selectedEdgeId, selectedNodeId, traceRootId, visibleData.edges, visibleData.nodes]);
 
   const selectedNode = useMemo(
     () => visibleData.nodes.find((node) => node.id === selectedNodeId),
@@ -296,6 +335,11 @@ export default function App() {
   const selectedEdge = useMemo(
     () => visibleData.edges.find((edge) => edge.id === selectedEdgeId),
     [visibleData.edges, selectedEdgeId],
+  );
+
+  const traceRoot = useMemo(
+    () => traceRootId ? baseVisibleData.nodes.find((node) => node.id === traceRootId) : undefined,
+    [baseVisibleData.nodes, traceRootId],
   );
 
   const selectedEdgeSource = selectedEdge
@@ -358,6 +402,7 @@ export default function App() {
   };
 
   const changeView = (mode: ViewMode) => {
+    clearTrace();
     setViewMode(mode);
     setActiveLens(
       mode === 'architecture'
@@ -376,6 +421,7 @@ export default function App() {
   };
 
   const activateLens = (lens: ArchitectureLens) => {
+    clearTrace();
     setActiveLens(lens);
     setViewMode(
       lens === 'system' || lens === 'areas' || lens === 'health' || lens === 'security'
@@ -409,21 +455,23 @@ export default function App() {
   const affectedFeatures = positiveCount(selectedNode?.metadata?.affectedFeatures);
   const hiddenNodes = positiveCount(visibleData.metadata?.hiddenNodes) ?? 0;
 
-  const searchPlaceholder = activeLens === 'security'
-    ? 'Find sensitive data, external systems, security evidence…'
-    : activeLens === 'request-flow'
-      ? 'Find a route, API, service…'
-      : activeLens === 'health'
-        ? 'Find a failing or impacted area…'
-        : viewMode === 'architecture'
-          ? 'Find a feature, integration, service…'
-          : viewMode === 'topology'
-            ? 'Find a feature, collection, integration…'
-            : viewMode === 'changes'
-              ? 'Find changed or affected code…'
-              : viewMode === 'drift'
-                ? 'Find added, removed, or modified architecture…'
-                : 'Find a route, component, file…';
+  const searchPlaceholder = traceRootId
+    ? `Search trace around ${traceRoot?.label ?? 'selection'}…`
+    : activeLens === 'security'
+      ? 'Find sensitive data, external systems, security evidence…'
+      : activeLens === 'request-flow'
+        ? 'Find a route, API, service…'
+        : activeLens === 'health'
+          ? 'Find a failing or impacted area…'
+          : viewMode === 'architecture'
+            ? 'Find a feature, integration, service…'
+            : viewMode === 'topology'
+              ? 'Find a feature, collection, integration…'
+              : viewMode === 'changes'
+                ? 'Find changed or affected code…'
+                : viewMode === 'drift'
+                  ? 'Find added, removed, or modified architecture…'
+                  : 'Find a route, component, file…';
 
   return (
     <main className="app-shell">
@@ -543,6 +591,7 @@ export default function App() {
               onClick={() => {
                 setErrorsOnly((value) => !value);
                 clearSelection();
+                clearTrace();
               }}
             >
               Errors only
@@ -556,6 +605,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => {
+              clearTrace();
               setFocusedFeatureId(undefined);
               clearSelection();
             }}
@@ -564,6 +614,20 @@ export default function App() {
           </button>
           <span>Exploring <strong>{focusedFeature?.label ?? focusedFeatureId}</strong></span>
         </div>
+      )}
+
+      {source === 'scan' && traceRootId && traceRoot && (
+        <TraceBar
+          rootLabel={traceRoot.label}
+          direction={traceDirection}
+          nodeCount={visibleData.nodes.length}
+          edgeCount={visibleData.edges.length}
+          onDirectionChange={(direction) => {
+            setTraceDirection(direction);
+            selectNode(traceRootId);
+          }}
+          onExit={exitTrace}
+        />
       )}
 
       <section className="workspace">
@@ -716,11 +780,27 @@ export default function App() {
                 </p>
               )}
 
-              {source === 'scan' && viewMode === 'architecture' && activeLens !== 'security' && selectedNode.kind === 'feature' && !focusedFeatureId && (
+              {source === 'scan' && selectedNode.drift !== 'removed' && (
+                <>
+                  <button
+                    type="button"
+                    className="trace-action"
+                    onClick={() => beginTrace(selectedNode.id)}
+                  >
+                    {traceRootId ? 'Continue trace from here' : 'Trace from here'}
+                  </button>
+                  <p className="trace-action-note">
+                    Isolate this node and its immediate incoming/outgoing architecture, then re-root the trace to keep following the path.
+                  </p>
+                </>
+              )}
+
+              {source === 'scan' && viewMode === 'architecture' && activeLens !== 'security' && selectedNode.kind === 'feature' && !focusedFeatureId && !traceRootId && (
                 <button
                   type="button"
                   className="primary-action"
                   onClick={() => {
+                    clearTrace();
                     setFocusedFeatureId(selectedNode.id);
                     clearSelection();
                   }}
