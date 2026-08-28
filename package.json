@@ -34,6 +34,8 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@lezer/common": "^1.5.2",
+    "@lezer/python": "^1.1.19",
     "@vitejs/plugin-react": "^4.3.4",
     "graphology": "^0.26.0",
     "graphology-layout-forceatlas2": "^0.10.1",
