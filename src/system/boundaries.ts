@@ -2,15 +2,17 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ArchGraphData, ArchNode } from '../types.js';
 
+// Convention-based boundaries are intentionally limited to plural container
+// directories. Singular names such as `app/`, `service/`, or `project/` are
+// common source-code folders (Next.js App Router is the obvious example) and
+// are not evidence that each direct child is an independently meaningful
+// system. Explicit workspace configuration can still establish any singular
+// path as a real boundary.
 const CONVENTION_ROOTS: Record<string, SystemBoundaryType> = {
   apps: 'application',
-  app: 'application',
   services: 'service',
-  service: 'service',
   packages: 'package',
-  package: 'package',
   projects: 'application',
-  project: 'application',
   libs: 'library',
   libraries: 'library',
 };
@@ -88,7 +90,7 @@ function matchWorkspacePattern(relativePath: string, patternInput: string) {
 
 function conventionBoundary(relativePath: string) {
   const parts = toPosix(relativePath).split('/').filter(Boolean);
-  if (parts.length < 2) return undefined;
+  if (parts.length < 3) return undefined;
   const type = CONVENTION_ROOTS[parts[0].toLowerCase()];
   if (!type) return undefined;
   return { root: `${parts[0]}/${parts[1]}`, type };
