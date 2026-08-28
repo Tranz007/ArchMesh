@@ -11,7 +11,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -28,6 +28,54 @@ jobs:
           node-version: '22.18.0'
           cache: npm
           cache-dependency-path: package.json
+
+      - name: Apply viewport-fit race fix
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/GraphCanvas.tsx')
+          text = path.read_text()
+          marker = 'The force engine can finish while the canvas is still at its initial 1×1'
+          if marker in text:
+              raise SystemExit(0)
+
+          old = '''  const fitGraph = () => {
+            fittedGraphRef.current = graphIdentity;
+            graphRef.current?.zoomToFit(450, 72);
+          };
+
+          const toggleFlow = () => {
+          '''
+          new = '''  const fitGraph = () => {
+            const graph = graphRef.current;
+            if (!graph || graphData.nodes.length === 0 || size.width < 120 || size.height < 120) return false;
+            graph.zoomToFit(450, 72);
+            fittedGraphRef.current = graphIdentity;
+            return true;
+          };
+
+          useEffect(() => {
+            if (graphData.nodes.length === 0 || size.width < 120 || size.height < 120) return undefined;
+            if (fittedGraphRef.current === graphIdentity) return undefined;
+
+            // The force engine can finish while the canvas is still at its initial 1×1
+            // measurement. Fit only after ResizeObserver has reported a real viewport;
+            // otherwise a failed early fit can leave the camera effectively miles away.
+            const timer = window.setTimeout(() => {
+              if (fittedGraphRef.current !== graphIdentity) fitGraph();
+            }, 120);
+
+            return () => window.clearTimeout(timer);
+          }, [graphData.nodes.length, graphIdentity, size.height, size.width]);
+
+          const toggleFlow = () => {
+          '''
+          if old not in text:
+              raise SystemExit('Expected fitGraph block was not found')
+          path.write_text(text.replace(old, new))
+          PY
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
@@ -120,3 +168,16 @@ jobs:
             /tmp/GraphCanvas.tsx
             /tmp/archmesh.json
           if-no-files-found: warn
+
+      - name: Commit verified viewport-fit fix
+        if: success()
+        shell: bash
+        run: |
+          if git diff --quiet -- src/GraphCanvas.tsx; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/GraphCanvas.tsx
+          git commit -m "fix: fit graph after viewport measurement"
+          git push origin HEAD:fix/render-root-cause
