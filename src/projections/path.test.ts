@@ -28,7 +28,8 @@ describe('projectPath', () => {
   it('does not invent a path in the wrong direction', () => {
     const result = projectPath(data, { sourceId: 'd', targetId: 'a', direction: 'outbound' });
     expect(result.metadata?.pathFound).toBe(false);
-    expect(result.nodes).toHaveLength(0);
+    expect(result.nodes.map((node) => node.id).sort()).toEqual(['a', 'd']);
+    expect(result.edges).toHaveLength(0);
   });
 
   it('can find a structural connection in both directions', () => {
