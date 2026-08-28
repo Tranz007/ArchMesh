@@ -20,6 +20,22 @@ function staticString(node: ts.Expression | undefined) {
   return undefined;
 }
 
+function sanitizeStaticUrl(value: string) {
+  if (value.startsWith('/')) return value.split(/[?#]/)[0];
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return value.split(/[?#]/)[0];
+    parsed.username = '';
+    parsed.password = '';
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return value.split(/[?#]/)[0];
+  }
+}
+
 function callName(call: ts.CallExpression) {
   if (ts.isIdentifier(call.expression)) return call.expression.text;
   if (ts.isPropertyAccessExpression(call.expression)) return call.expression.name.text;
@@ -91,8 +107,9 @@ export function collectHttpCalls(sourceFile: ts.SourceFile) {
 
   const visit = (node: ts.Node) => {
     if (ts.isCallExpression(node) && callName(node) === 'fetch') {
-      const url = staticString(node.arguments[0]);
-      if (url) {
+      const rawUrl = staticString(node.arguments[0]);
+      if (rawUrl) {
+        const url = sanitizeStaticUrl(rawUrl);
         const method = requestMethod(node);
         const bodyFields = requestBodyFields(node);
         const key = `${method}:${url}:${bodyFields.join(',')}`;
