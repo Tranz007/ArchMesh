@@ -300,7 +300,6 @@ export function GraphCanvas({
   const [flowEnabled, setFlowEnabled] = useState(false);
   const [flowScope, setFlowScope] = useState<FlowScope>('all');
   const fittedGraphRef = useRef<string | undefined>(undefined);
-  const previousViewportRef = useRef({ width: 1, height: 1 });
   const previousFlowSelectionRef = useRef('');
 
   useEffect(() => {
@@ -609,34 +608,12 @@ export function GraphCanvas({
     if (graphData.nodes.length === 0 || size.width < 120 || size.height < 120) return undefined;
     if (fittedGraphRef.current === graphIdentity) return undefined;
 
-    // Give the user a useful first frame once ResizeObserver reports a real
-    // viewport. The force engine may keep moving after this provisional fit;
-    // onEngineStop performs a second fit against the settled layout.
+    // Give each graph shape one useful initial frame after ResizeObserver reports
+    // a real viewport. Once framed, viewport resizing preserves the camera so
+    // selection, orbit, pan, and zoom do not jump unexpectedly.
     const timer = window.setTimeout(() => {
       if (fittedGraphRef.current !== graphIdentity) fitGraph();
     }, 120);
-
-    return () => window.clearTimeout(timer);
-  }, [graphData.nodes.length, graphIdentity, size.height, size.width]);
-
-  useEffect(() => {
-    const previous = previousViewportRef.current;
-    previousViewportRef.current = size;
-
-    if (graphData.nodes.length === 0 || size.width < 120 || size.height < 120) return undefined;
-    if (previous.width < 120 || previous.height < 120) return undefined;
-    if (previous.width === size.width && previous.height === size.height) return undefined;
-    if (fittedGraphRef.current !== graphIdentity) return undefined;
-
-    // ResizeObserver updates the canvas immediately while the perspective camera
-    // still has the old framing. Wait until the user stops dragging the browser
-    // edge, then refit once against the final viewport instead of fighting every
-    // intermediate pixel-sized resize event.
-    const timer = window.setTimeout(() => {
-      const graph = graphRef.current;
-      if (!graph) return;
-      graph.zoomToFit(300, 72);
-    }, 220);
 
     return () => window.clearTimeout(timer);
   }, [graphData.nodes.length, graphIdentity, size.height, size.width]);
@@ -813,10 +790,9 @@ export function GraphCanvas({
           onSelectEdge(undefined);
         }}
         onEngineStop={() => {
-          // The provisional viewport fit happens while the simulation is still
-          // moving. Always refit once d3 settles so the final graph cannot land
-          // outside the camera frustum or leave the viewer zoomed into one hub.
-          fitGraph();
+          // Engine stop is only a fallback for the initial framing race. Once
+          // this graph identity has been fitted, never reframe the user's camera.
+          if (fittedGraphRef.current !== graphIdentity) fitGraph();
         }}
       />
       <div className="graph-controls">
