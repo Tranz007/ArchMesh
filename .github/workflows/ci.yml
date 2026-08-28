@@ -41,13 +41,8 @@ jobs:
           if marker in text:
               raise SystemExit(0)
 
-          old = '''  const fitGraph = () => {
-            fittedGraphRef.current = graphIdentity;
-            graphRef.current?.zoomToFit(450, 72);
-          };
-
-          const toggleFlow = () => {
-          '''
+          start = text.index('  const fitGraph = () => {')
+          end = text.index('  const toggleFlow = () => {', start)
           new = '''  const fitGraph = () => {
             const graph = graphRef.current;
             if (!graph || graphData.nodes.length === 0 || size.width < 120 || size.height < 120) return false;
@@ -70,11 +65,8 @@ jobs:
             return () => window.clearTimeout(timer);
           }, [graphData.nodes.length, graphIdentity, size.height, size.width]);
 
-          const toggleFlow = () => {
-          '''
-          if old not in text:
-              raise SystemExit('Expected fitGraph block was not found')
-          path.write_text(text.replace(old, new))
+'''
+          path.write_text(text[:start] + new + text[end:])
           PY
 
       - name: Install dependencies
