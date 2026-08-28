@@ -263,8 +263,117 @@
   margin-top: 20px;
 }
 
+.trace-bar {
+  min-height: 48px;
+  padding: 7px 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #202a3c;
+  background: linear-gradient(90deg, rgba(24, 38, 61, .92), rgba(12, 19, 31, .96));
+  color: #a9b7ca;
+}
+
+.trace-context {
+  min-width: 210px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.trace-context > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.trace-context strong {
+  color: #eef4ff;
+  font-weight: 700;
+}
+
+.trace-context small {
+  color: #72839d;
+  font-size: 9px;
+}
+
+.trace-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(107, 151, 214, .4);
+  border-radius: 8px;
+  background: rgba(77, 123, 187, .12);
+  color: #8eb9f2;
+}
+
+.trace-direction {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.trace-direction button,
+.trace-exit {
+  height: 30px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid #334158;
+  border-radius: 7px;
+  background: #111a29;
+  color: #9aa9bd;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.trace-direction button:hover,
+.trace-exit:hover {
+  border-color: #51698f;
+  color: #e2ebf8;
+  background: #17243a;
+}
+
+.trace-direction button.active {
+  border-color: #5b8ed4;
+  background: #1c3556;
+  color: #eef6ff;
+  box-shadow: 0 0 0 1px rgba(91, 142, 212, .1);
+}
+
+.trace-exit {
+  border-color: #3a465a;
+  background: transparent;
+}
+
+.trace-action-note {
+  margin: 8px 0 14px;
+  color: #78879d;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+@media (max-width: 760px) {
+  .trace-bar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .trace-context { min-width: min(100%, 210px); }
+  .trace-direction { margin-left: 0; flex: 1 1 auto; }
+  .trace-direction button { flex: 1; }
+  .trace-exit { margin-left: auto; }
+}
+
 @media (max-width: 420px) {
   .edge-route { grid-template-columns: 1fr; }
   .edge-route > span { min-height: 36px; }
   .edge-route > span svg { transform: rotate(90deg); }
+  .trace-direction { width: 100%; }
 }
