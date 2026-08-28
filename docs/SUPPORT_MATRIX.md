@@ -20,8 +20,8 @@ A support level describes ArchMesh's evidence coverage. It does **not** mean Arc
 | Codebase / framework | Current level | What ArchMesh can see today | Important current gaps |
 | --- | --- | --- | --- |
 | **Next.js App Router** | **Deep** | TS/JS graph, pages, API route handlers, route paths, exported HTTP methods, server-action evidence, internal `/api/...` fetch mapping, static external fetches | Client/server component boundaries, dynamic URLs, framework-generated virtual modules |
-| **React + Vite** | **Structural** | TS/JS/JSX/TSX graph, components, services, imports, static `fetch()`, supported integrations | React Router/Vite semantics are not first-class yet |
-| **React / Create React App** | **Structural** | TS/JS/JSX/TSX graph, components, services, imports, static `fetch()`, supported integrations | Router semantics and build-specific boundaries are not first-class yet |
+| **React + Vite** | **Structural** | TS/JS/JSX/TSX graph, components, services, imports, static `fetch()`, supported integrations; unique relative fetches can link to compatible semantic API handlers | React Router/Vite semantics are not first-class yet; dynamic/base-URL requests remain unresolved |
+| **React / Create React App** | **Structural** | TS/JS/JSX/TSX graph, components, services, imports, static `fetch()`, supported integrations; unique relative fetches can link to compatible semantic API handlers | Router semantics and build-specific boundaries are not first-class yet; dynamic/base-URL requests remain unresolved |
 | **Node.js services / libraries** | **Structural** | TS/JS modules, imports, services/repositories/adapters, static `fetch()`, supported integrations | Framework route registration, queues, workers, and runtime-only loading need adapters |
 | **Express / Fastify / Hono** | **Structural** | Underlying TS/JS dependency graph and supported static HTTP/integration evidence | Route registration, middleware chains, request/response flow, framework-specific handlers |
 | **NestJS** | **Structural** | TypeScript dependency graph, generic service/component classification, supported integrations | Controllers, modules, providers, DI, decorators, guards/interceptors are not semantic entities yet |
@@ -29,9 +29,9 @@ A support level describes ArchMesh's evidence coverage. It does **not** mean Arc
 | **React Native / Expo** | **Structural** | TS/JS dependency graph, components, services, static `fetch()`, supported integrations | Expo Router/navigation, native modules, platform boundaries, app configuration semantics |
 | **Electron** | **Structural** | TS/JS graph across main/renderer source when inside the scanned root | IPC, preload/context bridge, process boundaries are not modeled yet |
 | **Python services / libraries** | **Structural** | `.py` source graph, absolute and relative package imports, root and `src/` layouts, module/service/data classification, selected integration imports | Dynamic imports, Python call graph, packaging semantics, framework-specific runtime meaning |
-| **FastAPI** | **Deep** | Python graph plus FastAPI route decorators, static methods/paths, static `APIRouter` prefixes, semantic handler nodes, selected `Depends(...)` evidence | Router inclusion across modules, dynamic route construction, middleware/security dependency semantics, request/response models |
+| **FastAPI** | **Deep** | Python graph plus FastAPI route decorators, static methods/paths, static `APIRouter` prefixes, semantic handler nodes, selected `Depends(...)` evidence; handlers can receive unique static JS/TS fetch links | Router inclusion across modules, dynamic route construction, middleware/security dependency semantics, request/response models |
 | **Django / Flask** | **Structural** | Underlying Python source/import graph and generic structure | Framework routes, handlers/views, middleware, ORM/framework data semantics need dedicated adapters |
-| **npm / Yarn workspaces and common app/service/package layouts** | **Structural** | Supported JS/TS/Python source is merged; `package.json` workspace roots and common `apps/`, `services/`, `packages/`, `projects/`, and library boundaries become first-class System Map nodes; cross-boundary source relationships and external integrations are aggregated | Package-manager dependency declarations, nested/advanced workspace globs, deployment topology, task graphs |
+| **npm / Yarn workspaces and common app/service/package layouts** | **Structural** | Supported JS/TS/Python source is merged; `package.json` workspace roots and common `apps/`, `services/`, `packages/`, `projects/`, and library boundaries become first-class System Map nodes; cross-boundary source/runtime relationships and external integrations are aggregated | Package-manager dependency declarations, nested/advanced workspace globs, deployment topology, task graphs |
 | **pnpm workspaces** | **Partial** | Common directory conventions are detected, and `package.json` workspaces work when present | `pnpm-workspace.yaml` is not parsed yet; package/task graph semantics remain incomplete |
 | **Turborepo / Nx** | **Partial** | Underlying supported source plus common app/package boundary conventions can be visualized | Turbo/Nx project configuration, task graph, implicit dependencies, generators, affected-project semantics |
 | **Vue / Nuxt** | **Partial** | Standalone `.ts` / `.js` source is scanned | `.vue` single-file components and Nuxt routing/server semantics are not parsed yet |
@@ -99,9 +99,34 @@ The built-in Python plugin uses a real Python syntax grammar and provides:
 
 Framework-specific meaning is layered on afterward. The FastAPI adapter currently adds semantic request-facing endpoints while Django/Flask remain structural-only.
 
+## Cross-language HTTP matching
+
+ArchMesh can now connect statically visible JavaScript/TypeScript requests to semantic API handlers produced by a framework adapter, including FastAPI handlers in Python.
+
+A connection is created only when all of the following evidence is available:
+
+- the caller is a scanned JavaScript/TypeScript source file;
+- the request uses a static relative `fetch()` URL such as `/orders`;
+- the HTTP method is statically visible (GET by default, or an explicit static method);
+- a semantic API node exposes a compatible static route path and method;
+- exactly one handler matches.
+
+Exact method/path matches take precedence. If there is no exact match, a single FastAPI-style parameterized path such as `/orders/{order_id}` can match a concrete path such as `/orders/123` when segment shape is unambiguous.
+
+ArchMesh deliberately does **not** link:
+
+- dynamic/template-composed request URLs;
+- absolute external HTTP(S) URLs to an internal handler;
+- ambiguous method/path matches where more than one semantic handler is plausible;
+- deployment/proxy rewrites that cannot be proven from repository evidence.
+
+The created `calls` edge records its provenance (`static-method-path`), the matched framework/route, source and target language, and whether it crosses a detected system boundary. Static request security metadata is preserved on the same edge. In the inspector, ArchMesh explains that this is source-level evidence rather than a runtime-success claim.
+
+Because the edge is part of the shared graph, System Map, Trace, Flow, Security, health propagation, change impact, and drift can operate on the relationship without needing a separate cross-language viewer.
+
 ## System boundary coverage
 
-ArchMesh can now add a system layer above the source/framework graph when repository evidence supports it.
+ArchMesh can add a system layer above the source/framework graph when repository evidence supports it.
 
 Current boundary evidence includes:
 
@@ -158,12 +183,13 @@ Once a language plugin contributes graph evidence, the rest of ArchMesh remains 
 - architecture drift between live scans;
 - lenses and progressive disclosure;
 - system-boundary aggregation when the repository provides boundary evidence;
+- static cross-language HTTP linking when caller/handler evidence is uniquely compatible;
 - Flow when a relationship has directional flow semantics;
 - Trace investigation;
 - search and inspection;
 - source editor navigation when the node has a local path.
 
-A mixed repository can activate multiple language plugins in one scan. For example, TypeScript frontend files and Python backend files can coexist in the same `ArchGraphData` graph and can belong to separate detected systems. Cross-language runtime endpoint matching remains a separate semantic layer and should be added only when both sides provide defensible evidence.
+A mixed repository can activate multiple language plugins in one scan. TypeScript frontend files and Python backend files can coexist in the same `ArchGraphData` graph, belong to separate detected systems, and connect through statically provable HTTP calls.
 
 ## What deeper framework support means
 
@@ -173,14 +199,14 @@ Likewise, Express support should understand registered routes and middleware; Vu
 
 ## Expansion priority
 
-Breadth matters to ArchMesh. The implemented architecture is **language plugin + framework adapters + shared graph model** rather than one scanner accumulating framework-specific special cases.
+Breadth matters to ArchMesh. The implemented architecture is **language plugin + framework adapters + shared graph model + evidence linkers** rather than one scanner accumulating framework-specific special cases.
 
 A practical next sequence is:
 
-1. add cross-language HTTP endpoint matching when a caller and handler both expose compatible static evidence;
-2. extend system/workspace evidence with `pnpm-workspace.yaml`, Nx/Turborepo project graphs, and deployment descriptors;
-3. deepen Angular with `HttpClient`, standalone/NgModule metadata, guards/interceptors, and selected RxJS semantics;
-4. deepen Node frameworks: Express/Fastify/Hono, NestJS, React Router/Vite, Expo Router;
+1. extend system/workspace evidence with `pnpm-workspace.yaml`, Nx/Turborepo project graphs, and deployment descriptors;
+2. deepen Angular with `HttpClient`, standalone/NgModule metadata, guards/interceptors, and selected RxJS semantics;
+3. deepen Node frameworks: Express/Fastify/Hono, NestJS, React Router/Vite, Expo Router;
+4. add Python outbound HTTP and additional framework-to-framework link evidence;
 5. add Django/Flask adapters and framework-native component formats such as Vue/Nuxt, Svelte/SvelteKit, Astro;
 6. add additional backend language families: Java/Kotlin, C#/.NET, Go;
 7. extend into additional ecosystems based on representative repositories and contributor demand.
