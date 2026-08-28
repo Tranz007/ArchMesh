@@ -136,6 +136,8 @@ JVM graph
 
 This prevents framework semantics from being duplicated inside language parsers and lets several frameworks reuse the same structural graph.
 
+The built-in `nextjs` adapter is the reference implementation. It activates only when repository evidence indicates Next.js and owns the currently supported App Router page/API paths, exported route methods, server-action evidence, and static same-origin `/api/...` call mapping. The base JavaScript/TypeScript parser does not infer those semantics from filenames alone.
+
 ## Plugin host contract
 
 The current internal contract lives under `src/plugins/` and is deliberately versioned.
@@ -192,9 +194,11 @@ The host rejects incompatible plugin API versions rather than attempting best-ef
 
 ## Current migration state
 
-The plugin host is now part of the real graph-build path, and the existing JavaScript/TypeScript scanner is registered as the first built-in language plugin.
+The plugin host is part of the real graph-build path. The existing JavaScript/TypeScript scanner is registered as the first built-in language plugin, and Next.js is the first production framework adapter.
 
-Some Next.js-specific behavior still lives inside the legacy JavaScript/TypeScript scanner. That behavior should be extracted into the first real framework adapter without changing the graph output. This is an intentional migration step: establish the host and compatibility contract first, then move existing semantics behind it with regression tests.
+The base JS/TS parser now remains framework-neutral for route/page/server-action behavior. Next.js detection and enrichment sit behind the adapter boundary with regression coverage for App Router pages, API routes, exported HTTP methods, server actions, internal API calls, and false-positive lookalike repositories.
+
+The next parser work can therefore use the same extension path rather than adding more framework-specific branches to `src/scanner/scan.ts`.
 
 ## Repository structure
 
@@ -203,6 +207,8 @@ src/
 ├── plugins/
 │   ├── languages/
 │   │   └── javascript-typescript.ts
+│   ├── frameworks/
+│   │   └── nextjs.ts
 │   ├── merge.ts
 │   ├── orchestrator.ts
 │   ├── registry.ts
@@ -213,6 +219,8 @@ src/
 │   └── config.ts
 ├── projections/
 ├── security/
+│   ├── classify.ts
+│   └── http.ts
 ├── health/
 ├── changes/
 ├── drift/
