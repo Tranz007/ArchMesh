@@ -91,7 +91,7 @@ export function projectPath(data: ArchGraphData, options: PathOptions): ArchGrap
   if (!found) {
     return {
       ...data,
-      nodes: [],
+      nodes: data.nodes.filter((node) => node.id === options.sourceId || node.id === options.targetId),
       edges: [],
       metadata: {
         ...data.metadata,
@@ -101,6 +101,7 @@ export function projectPath(data: ArchGraphData, options: PathOptions): ArchGrap
         pathDirection: direction,
         pathFound: false,
         pathMaxDepth: maxDepth,
+        hiddenNodes: Math.max(0, data.nodes.length - 2),
       },
     };
   }
