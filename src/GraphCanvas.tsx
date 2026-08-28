@@ -18,11 +18,8 @@ import SpriteText from 'three-spritetext';
 import {
   flowParticleSpeed,
   flowRenderEndpoints,
-  hasReverseFlow,
-  metadataFlowDirection,
   shouldAnimateFlowEdge,
   startFlowEmitter,
-  type FlowDirection,
   type FlowScope,
 } from './flow';
 import type {
@@ -61,31 +58,6 @@ const flowRelationColor: Partial<Record<ArchEdge['relation'], string>> = {
   reads: '#6ee7c4',
   writes: '#f4c86d',
   'integrates-with': '#c99cff',
-};
-
-const relationLabelWeight: Record<ArchEdge['relation'], number> = {
-  calls: 120,
-  reads: 110,
-  writes: 110,
-  'integrates-with': 95,
-  'depends-on': 70,
-  imports: 50,
-  contains: 20,
-};
-
-const kindLabelWeight: Record<string, number> = {
-  product: 120,
-  system: 110,
-  integration: 105,
-  data: 100,
-  api: 95,
-  service: 90,
-  feature: 80,
-  route: 65,
-  component: 50,
-  module: 35,
-  file: 20,
-  unknown: 10,
 };
 
 export const semanticKindColor: Record<string, string> = {
@@ -178,15 +150,12 @@ interface RenderNode {
 
 interface RenderLink {
   id: string;
-  evidenceId: string;
   source: string | RenderNode;
   target: string | RenderNode;
   evidenceSource: string;
   evidenceTarget: string;
   label: string;
   relation: ArchEdge['relation'];
-  flowDirection?: FlowDirection;
-  flowOnly: boolean;
   health: HealthState;
   change: ChangeState;
   drift: DriftState;
@@ -400,27 +369,16 @@ export function GraphCanvas({
     const links: RenderLink[] = data.edges
       .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
       .filter((edge) => !errorsOnly || edge.health !== 'healthy')
-      .flatMap((edge) => {
-        const flowDirection = metadataFlowDirection(edge.metadata);
-        const semanticEdge = {
+      .map((edge) => {
+        const renderEndpoints = flowRenderEndpoints(edge);
+        return {
           id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          relation: edge.relation,
-          flowDirection,
-        };
-        const renderEndpoints = flowRenderEndpoints(semanticEdge);
-        const base: RenderLink = {
-          id: edge.id,
-          evidenceId: edge.id,
           source: renderEndpoints.source,
           target: renderEndpoints.target,
           evidenceSource: edge.source,
           evidenceTarget: edge.target,
           label: edge.label ?? edge.relation,
           relation: edge.relation,
-          flowDirection,
-          flowOnly: false,
           health: edge.health,
           change: edge.change ?? 'unchanged',
           drift: edge.drift ?? 'stable',
@@ -434,19 +392,6 @@ export function GraphCanvas({
           securityExternalBoundary: edge.metadata?.securityExternalBoundary === true,
           securityBoundary: typeof edge.metadata?.securityBoundary === 'string' ? edge.metadata.securityBoundary : undefined,
         };
-
-        if (!hasReverseFlow(semanticEdge)) return [base];
-
-        return [
-          base,
-          {
-            ...base,
-            id: `${edge.id}:flow-reverse`,
-            source: edge.target,
-            target: edge.source,
-            flowOnly: true,
-          },
-        ];
       });
 
     return { nodes, links };
@@ -471,56 +416,6 @@ export function GraphCanvas({
     return { edgeEndpoints, neighbors };
   }, [data.edges, selectedEdgeId, selectedNodeId]);
 
-  const labelPriorityIds = useMemo(() => {
-    const result = new Set<string>();
-    if (selectedEdgeId) {
-      const edge = data.edges.find((candidate) => candidate.id === selectedEdgeId);
-      if (edge) {
-        result.add(edge.source);
-        result.add(edge.target);
-      }
-      return result;
-    }
-    if (!selectedNodeId) return result;
-
-    result.add(selectedNodeId);
-    const degree = new Map<string, number>();
-    for (const edge of data.edges) {
-      degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
-      degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
-    }
-
-    const nodeById = new Map(data.nodes.map((node) => [node.id, node]));
-    const scored = new Map<string, number>();
-    for (const edge of data.edges) {
-      const otherId = edge.source === selectedNodeId
-        ? edge.target
-        : edge.target === selectedNodeId
-          ? edge.source
-          : undefined;
-      if (!otherId) continue;
-      const node = nodeById.get(otherId);
-      if (!node) continue;
-      const healthBonus = node.health === 'error'
-        ? 240
-        : node.health === 'warning'
-          ? 160
-          : node.health === 'impacted'
-            ? 120
-            : 0;
-      const score = (relationLabelWeight[edge.relation] ?? 0)
-        + (kindLabelWeight[node.kind] ?? 0)
-        + Math.min(50, (degree.get(otherId) ?? 0) * 3)
-        + healthBonus;
-      scored.set(otherId, Math.max(scored.get(otherId) ?? 0, score));
-    }
-
-    for (const [id] of [...scored.entries()].sort((left, right) => right[1] - left[1]).slice(0, 12)) {
-      result.add(id);
-    }
-    return result;
-  }, [data.edges, data.nodes, selectedEdgeId, selectedNodeId]);
-
   const flowSelection = useMemo(() => ({
     enabled: flowEnabled,
     scope: flowScope,
@@ -535,17 +430,16 @@ export function GraphCanvas({
   };
 
   const isLinkFaded = (link: RenderLink) => {
-    if (selectedEdgeId) return link.evidenceId !== selectedEdgeId;
+    if (selectedEdgeId) return link.id !== selectedEdgeId;
     if (!selectedNodeId) return false;
     return link.evidenceSource !== selectedNodeId && link.evidenceTarget !== selectedNodeId;
   };
 
   const flowEdge = (link: RenderLink) => ({
-    id: link.evidenceId,
+    id: link.id,
     source: link.evidenceSource,
     target: link.evidenceTarget,
     relation: link.relation,
-    flowDirection: link.flowDirection,
   });
 
   const isFlowLinkActive = (link: RenderLink) => shouldAnimateFlowEdge(flowEdge(link), flowSelection);
@@ -571,31 +465,6 @@ export function GraphCanvas({
     });
   }, [flowEnabled, flowSelection, graphData.links]);
 
-  useEffect(() => {
-    const force = graphRef.current?.d3Force('link') as {
-      strength?: (accessor: (link: unknown) => number) => unknown;
-    } | undefined;
-    if (!force?.strength) return;
-
-    const degree = new Map<string, number>();
-    for (const link of graphData.links) {
-      if (link.flowOnly) continue;
-      const source = endpointId(link.source);
-      const target = endpointId(link.target);
-      degree.set(source, (degree.get(source) ?? 0) + 1);
-      degree.set(target, (degree.get(target) ?? 0) + 1);
-    }
-
-    force.strength((rawLink) => {
-      const link = rawLink as RenderLink;
-      if (link.flowOnly) return 0;
-      const sourceDegree = degree.get(endpointId(link.source)) ?? 1;
-      const targetDegree = degree.get(endpointId(link.target)) ?? 1;
-      return 1 / Math.max(1, Math.min(sourceDegree, targetDegree));
-    });
-    graphRef.current?.d3ReheatSimulation();
-  }, [graphData.links]);
-
   const graphIdentity = useMemo(
     () => `${visualMode}:${errorsOnly ? 'errors' : 'all'}:${graphData.nodes.map((node) => node.id).join('|')}`,
     [errorsOnly, graphData.nodes, visualMode],
@@ -603,7 +472,7 @@ export function GraphCanvas({
 
   const fitGraph = () => {
     fittedGraphRef.current = graphIdentity;
-    graphRef.current?.zoomToFit(450, 96);
+    graphRef.current?.zoomToFit(450, 72);
   };
 
   const toggleFlow = () => {
@@ -643,7 +512,7 @@ export function GraphCanvas({
           const selected = typedNode.id === selectedNodeId;
           const edgeEndpoint = selection.edgeEndpoints?.has(typedNode.id) ?? false;
           const radius = kindRadius[typedNode.kind] ?? kindRadius.unknown;
-          const scale = selected ? 1.24 : edgeEndpoint ? 1.15 : 1;
+          const scale = selected ? 1.28 : edgeEndpoint ? 1.15 : 1;
           group.scale.setScalar(scale);
 
           const material = new MeshStandardMaterial({
@@ -655,7 +524,7 @@ export function GraphCanvas({
                 ? 0.2
                 : 0.12,
             transparent: faded,
-            opacity: faded ? 0.18 : 0.96,
+            opacity: faded ? 0.22 : 0.96,
             emissive: typedNode.health === 'error' || typedNode.health === 'warning' || typedNode.health === 'impacted'
               ? healthColor[typedNode.health]
               : selected ? '#263d63' : '#000000',
@@ -682,22 +551,17 @@ export function GraphCanvas({
             group.add(shell);
           }
 
-          const selectedContext = Boolean(selectedNodeId || selectedEdgeId);
-          const showLabel = !faded && (
-            selected
-            || edgeEndpoint
-            || (selectedContext ? labelPriorityIds.has(typedNode.id) : alwaysLabelKinds.has(typedNode.kind))
-          );
+          const showLabel = !faded && (selected || edgeEndpoint || alwaysLabelKinds.has(typedNode.kind));
           if (showLabel) {
             const labelSize = selected
-              ? 3.8
+              ? 4.1
               : edgeEndpoint
-                ? 3.55
+                ? 3.7
                 : typedNode.kind === 'product'
-                  ? 3.6
+                  ? 3.7
                   : typedNode.kind === 'system'
-                    ? 3.3
-                    : 2.95;
+                    ? 3.4
+                    : 3.05;
             const sprite = new SpriteText(
               typedNode.label,
               labelSize,
@@ -718,17 +582,15 @@ export function GraphCanvas({
         }}
         linkColor={(link) => {
           const typedLink = link as RenderLink;
-          if (typedLink.flowOnly) return '#000000';
           if (flowScope === 'focus' && isFlowLinkActive(typedLink) && !isLinkFaded(typedLink)) return flowColor(typedLink);
-          return isLinkFaded(typedLink) ? '#171d2b' : typedLink.baseColor;
+          return isLinkFaded(typedLink) ? '#1b2232' : typedLink.baseColor;
         }}
         linkOpacity={visualMode === 'security' ? 0.72 : 0.55}
         linkWidth={(link) => {
           const typedLink = link as RenderLink;
-          if (typedLink.flowOnly) return 0;
-          if (typedLink.evidenceId === selectedEdgeId) return isFlowLinkActive(typedLink) ? 1.15 : 2.4;
-          if (isLinkFaded(typedLink)) return 0.02;
-          if (flowScope === 'focus' && isFlowLinkActive(typedLink)) return 0.52;
+          if (typedLink.id === selectedEdgeId) return isFlowLinkActive(typedLink) ? 1.15 : 2.4;
+          if (isLinkFaded(typedLink)) return 0.035;
+          if (flowScope === 'focus' && isFlowLinkActive(typedLink)) return 0.5;
           if (visualMode === 'security') {
             if (typedLink.securityFinding || typedLink.securityTransport === 'cleartext') return 1.8;
             if (typedLink.securitySensitiveData) return 1.05;
@@ -759,9 +621,9 @@ export function GraphCanvas({
         linkDirectionalArrowLength={(link) => {
           const typedLink = link as RenderLink;
           if (isLinkFaded(typedLink)) return 0;
-          if (typedLink.evidenceId === selectedEdgeId) return isFlowLinkActive(typedLink) ? 1.7 : 3;
+          if (typedLink.id === selectedEdgeId) return isFlowLinkActive(typedLink) ? 1.7 : 3;
           if (flowScope === 'focus' && isFlowLinkActive(typedLink)) return 1.05;
-          if (!typedLink.flowOnly && (typedLink.health === 'error' || typedLink.health === 'impacted')) return 2.3;
+          if (typedLink.health === 'error' || typedLink.health === 'impacted') return 2.3;
           return 0;
         }}
         linkDirectionalArrowRelPos={0.82}
@@ -773,8 +635,8 @@ export function GraphCanvas({
         linkDirectionalParticleWidth={(link) => {
           const typedLink = link as RenderLink;
           if (!isFlowLinkActive(typedLink)) return 0;
-          if (typedLink.evidenceId === selectedEdgeId) return 0.82;
-          return flowScope === 'focus' ? 0.62 : 0.42;
+          if (typedLink.id === selectedEdgeId) return 0.48;
+          return flowScope === 'focus' ? 0.34 : 0.24;
         }}
         linkDirectionalParticleSpeed={(link) => flowParticleSpeed((link as RenderLink).relation)}
         linkDirectionalParticleColor={(link) => flowColor(link as RenderLink)}
@@ -786,7 +648,7 @@ export function GraphCanvas({
         onLinkClick={(link) => {
           const typedLink = link as RenderLink;
           onSelectNode(undefined);
-          onSelectEdge(typedLink.evidenceId);
+          onSelectEdge(typedLink.id);
         }}
         onBackgroundClick={() => {
           onSelectNode(undefined);
@@ -805,7 +667,7 @@ export function GraphCanvas({
             className={flowEnabled ? 'active' : ''}
             aria-pressed={flowEnabled}
             onClick={toggleFlow}
-            title="Animate illustrative directional calls, reads, writes, and evidence-backed integrations"
+            title="Animate illustrative directional calls, reads, writes, and integrations"
           >
             Flow {flowEnabled ? 'on' : 'off'}
           </button>
