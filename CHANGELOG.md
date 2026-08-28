@@ -45,7 +45,7 @@ ArchMesh is pre-1.0 and its architecture may evolve quickly. Entries should stil
 - Internal `fetch('/api/...')` relationships.
 - External HTTP-host integrations.
 - Firestore collection discovery with read, write, and listener relationships.
-- First-class integration nodes for Firebase, Stripe, OpenAI, WorkOS, Resend, Vercel, and HTTP-host nodes.
+- First-class integration nodes for Firebase, Stripe, OpenAI, WorkOS, Resend, and Vercel.
 - Dedicated data/integration Topology projection.
 
 #### Health and failures
@@ -79,7 +79,7 @@ ArchMesh is pre-1.0 and its architecture may evolve quickly. Entries should stil
 - Viewer graph refresh through a Vite custom event without a full page reload.
 - Active graph mode preserved across refreshes.
 - Node/edge selection preserved while the selected identity still exists.
-- Graph-to-graph architecture drift between consecutive successful watch scans.
+- Graph-to-graph drift comparison between consecutive successful watch scans.
 - Independent `stable`, `added`, `removed`, and `modified` architecture states.
 - Structural comparison based on stable node identity and structural edge signatures rather than generated edge IDs.
 - Structural fingerprints ignore runtime health and Git change overlays.
