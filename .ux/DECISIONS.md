@@ -61,3 +61,33 @@ Reason: prevent an expanding roadmap from delaying a coherent first release inde
 After the initial graph framing, resizing the browser or graph container updates the rendering viewport without automatically invoking `Fit graph`. Automatic fitting is reserved for a new graph identity or the initial viewport-fit fallback; users can explicitly reframe with the `Fit graph` control.
 
 Reason: resizing the viewport should not overwrite orbit, pan, or zoom state or destroy the user's spatial context while inspecting a selected entity.
+
+## 2026-08-28 — Lenses answer what; Scenes answer where
+
+Architecture lenses describe the kind of question a user is asking of the system: architecture, topology, change, security, implementation detail, and similar perspectives. Focused Scenes describe which bounded part of the architecture the user wants to understand.
+
+A Scene is a projection over the existing graph, not a separately maintained diagram. Candidate Scenes are derived from detected architecture; users may also save local custom views that reference stable graph IDs.
+
+Reason: a large code graph is useful as terrain, but comprehension happens when a user can isolate a concrete architectural concern such as one integration, feature, route, service, or data boundary without losing evidence.
+
+## 2026-08-28 — Health and Drift are capability-aware
+
+Health is surfaced as an active lens only when direct health evidence or an explicitly enabled local health adapter backs the graph. Drift is surfaced only after a previous successful graph exists for comparison.
+
+The UI must not present an apparently functional Health or Drift control when selecting it cannot materially change the evidence shown.
+
+Reason: empty affordances undermine trust and can imply runtime or historical knowledge that ArchMesh does not actually possess.
+
+## 2026-08-28 — Static Flow is illustrative, not telemetry
+
+Directional Flow derived from source and semantic graph evidence communicates detected direction. It does not represent measured request volume, latency, timing, or live runtime activity unless a future runtime connector explicitly supplies that evidence.
+
+Reason: animation can make architecture easier to understand, but motion must not be mistaken for observability data.
+
+## 2026-08-28 — Journeys are local architectural explanations
+
+A Journey is an ordered sequence of known graph entities used to explain architecture through focused camera/context changes. Journey playback and baseline recording remain local and operate only on existing graph evidence.
+
+The browser recording path prefers a supported MP4 `MediaRecorder` format. When the browser cannot produce MP4 directly, ArchMesh exports a truthfully labeled WebM rather than requiring a hosted transcoding service or creating a mislabeled file.
+
+Reason: architecture walkthroughs should be easy to share while preserving the project's local-first boundary and evidence discipline.
