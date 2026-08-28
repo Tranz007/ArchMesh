@@ -16,10 +16,13 @@ import {
 } from 'three';
 import SpriteText from 'three-spritetext';
 import {
-  flowParticleSpeed,
+  flowParticleDuration,
   flowRenderEndpoints,
+  metadataFlowDirection,
   shouldAnimateFlowEdge,
   startFlowEmitter,
+  type FlowDirection,
+  type FlowEmissionDirection,
   type FlowScope,
 } from './flow';
 import type {
@@ -156,6 +159,7 @@ interface RenderLink {
   evidenceTarget: string;
   label: string;
   relation: ArchEdge['relation'];
+  flowDirection?: FlowDirection;
   health: HealthState;
   change: ChangeState;
   drift: DriftState;
@@ -166,6 +170,14 @@ interface RenderLink {
   securitySeverity?: string;
   securityExternalBoundary: boolean;
   securityBoundary?: string;
+}
+
+interface ActiveFlowParticle {
+  mesh: Mesh;
+  link: RenderLink;
+  direction: FlowEmissionDirection;
+  startedAt: number;
+  duration: number;
 }
 
 function stableCoordinate(id: string, salt: number) {
@@ -225,10 +237,6 @@ function securityEdgeColor(edge: ArchEdge) {
   return '#3c4960';
 }
 
-function endpointId(endpoint: string | RenderNode) {
-  return typeof endpoint === 'string' ? endpoint : endpoint.id;
-}
-
 function geometryForKind(kind: string, radius: number): BufferGeometry {
   switch (kind) {
     case 'product':
@@ -256,6 +264,14 @@ function geometryForKind(kind: string, radius: number): BufferGeometry {
   }
 }
 
+function disposeFlowParticle(particle: ActiveFlowParticle, group?: Group) {
+  group?.remove(particle.mesh);
+  particle.mesh.geometry.dispose();
+  const material = particle.mesh.material;
+  if (Array.isArray(material)) material.forEach((entry) => entry.dispose());
+  else material.dispose();
+}
+
 interface GraphCanvasProps {
   data: ArchGraphData;
   errorsOnly: boolean;
@@ -277,6 +293,9 @@ export function GraphCanvas({
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
+  const flowOverlayRef = useRef<Group | undefined>(undefined);
+  const activeFlowParticlesRef = useRef<ActiveFlowParticle[]>([]);
+  const flowFrameRef = useRef<number | undefined>(undefined);
   const [size, setSize] = useState({ width: 1, height: 1 });
   const [flowEnabled, setFlowEnabled] = useState(false);
   const [flowScope, setFlowScope] = useState<FlowScope>('all');
@@ -383,6 +402,7 @@ export function GraphCanvas({
           evidenceTarget: edge.target,
           label: edge.label ?? edge.relation,
           relation: edge.relation,
+          flowDirection: metadataFlowDirection(edge.metadata),
           health: edge.health,
           change: edge.change ?? 'unchanged',
           drift: edge.drift ?? 'stable',
@@ -444,6 +464,7 @@ export function GraphCanvas({
     source: link.evidenceSource,
     target: link.evidenceTarget,
     relation: link.relation,
+    flowDirection: link.flowDirection,
   });
 
   const isFlowLinkActive = (link: RenderLink) => shouldAnimateFlowEdge(flowEdge(link), flowSelection);
@@ -456,6 +477,73 @@ export function GraphCanvas({
 
   useEffect(() => {
     if (!flowEnabled) return undefined;
+    const graph = graphRef.current;
+    if (!graph) return undefined;
+
+    const overlay = new Group();
+    overlay.name = 'archmesh-flow-overlay';
+    graph.scene().add(overlay);
+    flowOverlayRef.current = overlay;
+
+    const tick = (now: number) => {
+      const next: ActiveFlowParticle[] = [];
+
+      for (const particle of activeFlowParticlesRef.current) {
+        const source = typeof particle.link.source === 'string' ? undefined : particle.link.source;
+        const target = typeof particle.link.target === 'string' ? undefined : particle.link.target;
+        const valid = source
+          && target
+          && Number.isFinite(source.x)
+          && Number.isFinite(source.y)
+          && Number.isFinite(source.z)
+          && Number.isFinite(target.x)
+          && Number.isFinite(target.y)
+          && Number.isFinite(target.z);
+
+        if (!valid) {
+          disposeFlowParticle(particle, overlay);
+          continue;
+        }
+
+        const progress = Math.max(0, Math.min(1, (now - particle.startedAt) / particle.duration));
+        if (progress >= 1) {
+          disposeFlowParticle(particle, overlay);
+          continue;
+        }
+
+        // Keep packets just outside node centers so the direction is legible.
+        const forwardT = 0.08 + (progress * 0.84);
+        const t = particle.direction === 'source-to-target' ? forwardT : 1 - forwardT;
+        particle.mesh.position.set(
+          source.x + ((target.x - source.x) * t),
+          source.y + ((target.y - source.y) * t),
+          source.z + ((target.z - source.z) * t),
+        );
+        next.push(particle);
+      }
+
+      activeFlowParticlesRef.current = next;
+      flowFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    flowFrameRef.current = window.requestAnimationFrame(tick);
+
+    return () => {
+      if (flowFrameRef.current !== undefined) {
+        window.cancelAnimationFrame(flowFrameRef.current);
+        flowFrameRef.current = undefined;
+      }
+      for (const particle of activeFlowParticlesRef.current) {
+        disposeFlowParticle(particle, overlay);
+      }
+      activeFlowParticlesRef.current = [];
+      graph.scene().remove(overlay);
+      flowOverlayRef.current = undefined;
+    };
+  }, [flowEnabled, graphData.links]);
+
+  useEffect(() => {
+    if (!flowEnabled) return undefined;
 
     const emitterEdges = graphData.links.map((link) => ({
       ...flowEdge(link),
@@ -465,9 +553,44 @@ export function GraphCanvas({
     return startFlowEmitter({
       edges: emitterEdges,
       selection: flowSelection,
-      emit: ({ renderLink }) => graphRef.current?.emitParticle(renderLink),
+      emit: ({ renderLink }, direction) => {
+        const overlay = flowOverlayRef.current;
+        if (!overlay) return;
+
+        // Bound visual work even on very dense graphs. Oldest particles are
+        // removed first; this never alters graph evidence or topology.
+        while (activeFlowParticlesRef.current.length >= 96) {
+          const oldest = activeFlowParticlesRef.current.shift();
+          if (oldest) disposeFlowParticle(oldest, overlay);
+        }
+
+        const radius = renderLink.id === selectedEdgeId
+          ? 1.45
+          : flowScope === 'focus'
+            ? 1.18
+            : 0.92;
+        const mesh = new Mesh(
+          new SphereGeometry(radius, 10, 8),
+          new MeshBasicMaterial({
+            color: flowColor(renderLink),
+            transparent: true,
+            opacity: 0.96,
+            depthWrite: false,
+            depthTest: false,
+          }),
+        );
+        mesh.renderOrder = 2000;
+        overlay.add(mesh);
+        activeFlowParticlesRef.current.push({
+          mesh,
+          link: renderLink,
+          direction,
+          startedAt: performance.now(),
+          duration: flowParticleDuration(renderLink.relation),
+        });
+      },
     });
-  }, [flowEnabled, flowSelection, graphData.links]);
+  }, [flowEnabled, flowSelection, graphData.links, flowScope, selectedEdgeId, visualMode]);
 
   const graphIdentity = useMemo(
     () => `${visualMode}:${errorsOnly ? 'errors' : 'all'}:${graphData.nodes.map((node) => node.id).join('|')}`,
@@ -675,14 +798,6 @@ export function GraphCanvas({
           return isFlowLinkActive(typedLink) ? flowColor(typedLink) : typedLink.baseColor;
         }}
         linkDirectionalParticles={0}
-        linkDirectionalParticleWidth={(link) => {
-          const typedLink = link as RenderLink;
-          if (!isFlowLinkActive(typedLink)) return 0;
-          if (typedLink.id === selectedEdgeId) return 0.48;
-          return flowScope === 'focus' ? 0.34 : 0.24;
-        }}
-        linkDirectionalParticleSpeed={(link) => flowParticleSpeed((link as RenderLink).relation)}
-        linkDirectionalParticleColor={(link) => flowColor(link as RenderLink)}
         onNodeClick={(node) => {
           const typedNode = node as RenderNode;
           onSelectEdge(undefined);
@@ -712,7 +827,7 @@ export function GraphCanvas({
             className={flowEnabled ? 'active' : ''}
             aria-pressed={flowEnabled}
             onClick={toggleFlow}
-            title="Animate safely supported directional calls and writes"
+            title="Animate detected calls, reads, writes, and integration flow"
           >
             Flow {flowEnabled ? 'on' : 'off'}
           </button>
@@ -733,7 +848,7 @@ export function GraphCanvas({
                 className={flowScope === 'all' ? 'active secondary' : 'secondary'}
                 aria-pressed={flowScope === 'all'}
                 onClick={() => setFlowScope('all')}
-                title="Simulate intermittent pulses across every safely supported visible flow"
+                title="Show staggered flow across visible directional relationships"
               >
                 All
               </button>
@@ -743,10 +858,10 @@ export function GraphCanvas({
         <span aria-hidden="true">
           {flowEnabled
             ? visualMode === 'security'
-              ? 'Illustrative pulses show supported direction; security colors remain evidence-based'
+              ? 'Illustrative pulses show detected direction; security colors remain evidence-based'
               : flowScope === 'focus'
                 ? 'Illustrative pulses are staggered around the selection · not runtime traffic volume'
-                : 'Illustrative pulses are staggered from static evidence · reverse flow remains evidence-only'
+                : 'Illustrative pulses are staggered from static evidence · not runtime traffic volume'
             : 'Drag to orbit · Scroll to zoom · Right-drag to pan'}
         </span>
       </div>
