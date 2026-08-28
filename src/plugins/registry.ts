@@ -1,3 +1,4 @@
+import { angularAdapter } from './frameworks/angular.js';
 import { fastApiAdapter } from './frameworks/fastapi.js';
 import { nextJsAdapter } from './frameworks/nextjs.js';
 import { javascriptTypeScriptPlugin } from './languages/javascript-typescript.js';
@@ -16,4 +17,5 @@ export const builtInLanguagePlugins: LanguagePlugin[] = [
 export const builtInFrameworkAdapters: FrameworkAdapter[] = [
   nextJsAdapter,
   fastApiAdapter,
+  angularAdapter,
 ];
