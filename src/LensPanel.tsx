@@ -7,6 +7,7 @@ import {
   History,
   Network,
   Route,
+  ShieldCheck,
 } from 'lucide-react';
 import type { ArchitectureLens } from './lenses';
 
@@ -45,6 +46,12 @@ const lenses: Array<{
     title: 'Routes & APIs',
     description: 'Request-facing routes, APIs, services, and adjacent runtime dependencies.',
     icon: Route,
+  },
+  {
+    id: 'security',
+    title: 'Security',
+    description: 'Sensitive-data flows, transport evidence, external boundaries, and unknown protections.',
+    icon: ShieldCheck,
   },
   {
     id: 'changes',
