@@ -1,4 +1,4 @@
-import type { ArchEdge, GraphMetadata } from './types';
+import type { ArchEdge, GraphMetadata } from './types.js';
 
 export type FlowScope = 'focus' | 'all';
 export type FlowDirection = 'source-to-target' | 'target-to-source' | 'both' | 'unknown';
