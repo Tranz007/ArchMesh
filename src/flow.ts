@@ -2,6 +2,7 @@ import type { ArchEdge, GraphMetadata } from './types.js';
 
 export type FlowScope = 'focus' | 'all';
 export type FlowDirection = 'source-to-target' | 'target-to-source' | 'both' | 'unknown';
+export type FlowEmissionDirection = 'source-to-target' | 'target-to-source';
 
 const directionalFlowRelations = new Set<ArchEdge['relation']>([
   'calls',
@@ -94,14 +95,22 @@ export function hasDirectionalFlowEvidence(edge: Pick<FlowEdgeLike, 'relation' |
 }
 
 /**
- * The force graph currently has a safe built-in particle path only in the
- * structural source -> target direction. Reverse and bidirectional evidence is
- * still retained and labeled, but it must not be implemented by reversing or
- * duplicating force links. A future visual-only pulse layer can consume those
- * directions without participating in layout.
+ * Expand one evidence direction into the visual-only pulse directions that
+ * should be emitted. Bidirectional evidence deliberately becomes two independent
+ * visual emitters; neither direction changes or duplicates the force topology.
  */
+export function flowEmissionDirections(
+  edge: Pick<FlowEdgeLike, 'relation' | 'flowDirection'>,
+): FlowEmissionDirection[] {
+  const direction = flowDirectionForEdge(edge);
+  if (direction === 'source-to-target') return ['source-to-target'];
+  if (direction === 'target-to-source') return ['target-to-source'];
+  if (direction === 'both') return ['source-to-target', 'target-to-source'];
+  return [];
+}
+
 export function canAnimateFlowDirection(edge: Pick<FlowEdgeLike, 'relation' | 'flowDirection'>) {
-  return flowDirectionForEdge(edge) === 'source-to-target';
+  return flowEmissionDirections(edge).length > 0;
 }
 
 export function shouldAnimateFlowEdge(edge: FlowEdgeLike, selection: FlowSelection) {
@@ -115,32 +124,37 @@ export function shouldAnimateFlowEdge(edge: FlowEdgeLike, selection: FlowSelecti
 }
 
 /**
- * Force-layout endpoints are structural evidence, never animation state. Earlier
- * flow work swapped read endpoints here so particles could travel backwards;
- * that coupled packet direction to the d3 topology and made a visual feature
- * capable of destabilizing the entire scene. Keep the force link orientation
- * immutable. Reverse/bidirectional pulses belong in a visual-only layer.
+ * Force-layout endpoints are structural evidence, never animation state. Flow
+ * direction is rendered by a separate Three.js overlay, so reverse and
+ * bidirectional movement can never perturb d3 topology.
  */
-export function flowRenderEndpoints(edge: Pick<FlowEdgeLike, 'source' | 'target' | 'relation' | 'flowDirection'>) {
+export function flowRenderEndpoints(edge: Pick<FlowEdgeLike, 'source' | 'target'>) {
   return { source: edge.source, target: edge.target };
 }
 
-/**
- * Bidirectional evidence remains part of the graph model, but the renderer must
- * not materialize a second hidden force-graph link merely to animate it. That
- * approach can destabilize the scene even when Flow is off. A safer visual-only
- * reverse pulse mechanism will consume the same `both` evidence separately.
- */
-export function hasReverseFlow(_edge: Pick<FlowEdgeLike, 'relation' | 'flowDirection'>) {
-  return false;
+export function hasReverseFlow(edge: Pick<FlowEdgeLike, 'relation' | 'flowDirection'>) {
+  const direction = flowDirectionForEdge(edge);
+  return direction === 'target-to-source' || direction === 'both';
 }
 
+/**
+ * Retained as a relation-level pacing helper for compatibility. The visual
+ * overlay uses duration rather than mutating a force-graph link's speed.
+ */
 export function flowParticleSpeed(relation: ArchEdge['relation']) {
   if (relation === 'calls') return 0.0052;
   if (relation === 'writes') return 0.0044;
   if (relation === 'reads') return 0.0041;
   if (relation === 'integrates-with') return 0.0036;
   return 0;
+}
+
+export function flowParticleDuration(relation: ArchEdge['relation']) {
+  if (relation === 'calls') return 850;
+  if (relation === 'writes') return 980;
+  if (relation === 'reads') return 1050;
+  if (relation === 'integrates-with') return 1150;
+  return 1000;
 }
 
 export function flowDirectionLabel(
@@ -158,15 +172,14 @@ function relationDelayMultiplier(relation: ArchEdge['relation']) {
   if (relation === 'calls') return 0.82;
   if (relation === 'reads') return 1.05;
   if (relation === 'writes') return 1.12;
-  if (relation === 'integrates-with') return 1.34;
+  if (relation === 'integrates-with') return 1.18;
   return 1;
 }
 
 /**
- * Returns an illustrative delay between one-shot pulses. The random source is
- * injectable so tests can assert bounds without making production animation
- * deterministic. These timings represent visual pacing only, never traffic
- * volume or runtime frequency.
+ * Returns an illustrative delay between one-shot pulses. Flow should visibly
+ * react soon after it is enabled, while recurring emissions remain independently
+ * staggered so the graph never looks like synchronized fake traffic.
  */
 export function flowEmissionDelay(
   edge: Pick<FlowEdgeLike, 'relation'>,
@@ -179,14 +192,14 @@ export function flowEmissionDelay(
   let max: number;
 
   if (selection.scope === 'focus' && selection.selectedEdgeId) {
-    min = initial ? 60 : 480;
-    max = initial ? 180 : 1150;
+    min = initial ? 35 : 360;
+    max = initial ? 110 : 780;
   } else if (selection.scope === 'focus') {
-    min = initial ? 90 : 720;
-    max = initial ? 720 : 2200;
+    min = initial ? 55 : 560;
+    max = initial ? 360 : 1350;
   } else {
-    min = initial ? 180 : 1700;
-    max = initial ? 3200 : 5600;
+    min = initial ? 70 : 820;
+    max = initial ? 620 : 2300;
   }
 
   const base = min + ((max - min) * clampedRandom);
@@ -196,15 +209,16 @@ export function flowEmissionDelay(
 export interface FlowEmitterOptions<T extends FlowEdgeLike> {
   edges: T[];
   selection: FlowSelection;
-  emit: (edge: T) => void;
+  emit: (edge: T, direction: FlowEmissionDirection) => void;
   random?: () => number;
   setTimer?: typeof setTimeout;
   clearTimer?: typeof clearTimeout;
 }
 
 /**
- * Emit non-cyclical particles at independent intervals. Each edge owns its own
- * timer, so a system never looks like every request fired on the same frame.
+ * Emit non-cyclical particles at independent intervals. Each visible direction
+ * owns its own timer. A bidirectional relationship therefore receives two
+ * independently staggered visual streams without creating a second force link.
  */
 export function startFlowEmitter<T extends FlowEdgeLike>({
   edges,
@@ -214,22 +228,27 @@ export function startFlowEmitter<T extends FlowEdgeLike>({
   setTimer = setTimeout,
   clearTimer = clearTimeout,
 }: FlowEmitterOptions<T>) {
-  const activeEdges = edges.filter((edge) => shouldAnimateFlowEdge(edge, selection));
+  const activePaths = edges
+    .filter((edge) => shouldAnimateFlowEdge(edge, selection))
+    .flatMap((edge) => flowEmissionDirections(edge).map((direction) => ({ edge, direction })));
   const timers = new Set<ReturnType<typeof setTimeout>>();
   let stopped = false;
 
-  const schedule = (edge: T, initial: boolean) => {
+  const schedule = (
+    path: { edge: T; direction: FlowEmissionDirection },
+    initial: boolean,
+  ) => {
     if (stopped) return;
     const timer = setTimer(() => {
       timers.delete(timer);
       if (stopped) return;
-      emit(edge);
-      schedule(edge, false);
-    }, flowEmissionDelay(edge, selection, random, initial));
+      emit(path.edge, path.direction);
+      schedule(path, false);
+    }, flowEmissionDelay(path.edge, selection, random, initial));
     timers.add(timer);
   };
 
-  for (const edge of activeEdges) schedule(edge, true);
+  for (const path of activePaths) schedule(path, true);
 
   return () => {
     stopped = true;
