@@ -1,144 +1,260 @@
 # ArchMesh architecture
 
-ArchMesh is intentionally local-first. Source code is scanned on the developer's machine, transformed into a typed graph model, and rendered in the browser. No external database or hosted service is required for the core experience.
+ArchMesh is intentionally local-first. Source code is scanned on the developer's machine, transformed into a shared graph model, enriched by optional framework/platform semantics, and rendered in the browser. No external database, hosted service, or LLM is required for the core experience.
 
 ## System shape
 
 ```text
-┌──────────────────────┐
-│ Target repository    │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ Scanner               │
-│ TypeScript/JavaScript │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ ArchGraphData         │
-│ nodes + edges + health│
-└──────────┬───────────┘
-           │ JSON (V1)
-           ▼
-┌──────────────────────┐
-│ Graphology           │
-│ in-memory graph       │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ Sigma.js viewer       │
-│ search / focus / UI   │
-└──────────────────────┘
+┌──────────────────────────┐
+│ Target repository        │
+│ one or many languages    │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│ Scanner plugin host      │
+├──────────────────────────┤
+│ JS / TS language plugin  │
+│ Python plugin (future)   │
+│ JVM plugin (future)      │
+│ .NET plugin (future)     │
+│ ...                      │
+└────────────┬─────────────┘
+             │ graph fragments
+             ▼
+┌──────────────────────────┐
+│ Shared ArchGraphData     │
+│ merge by stable identity │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│ Framework adapters       │
+├──────────────────────────┤
+│ Next.js                  │
+│ Angular (future)         │
+│ FastAPI (future)         │
+│ Spring (future)          │
+│ ASP.NET (future)         │
+│ ...                      │
+└────────────┬─────────────┘
+             │ semantic contributions
+             ▼
+┌──────────────────────────┐
+│ ArchGraphData            │
+│ nodes + edges + evidence │
+└────────────┬─────────────┘
+             │
+             ├── health overlays
+             ├── Git change impact
+             ├── drift comparison
+             ├── lenses / trace
+             └── security evidence
+             │
+             ▼
+┌──────────────────────────┐
+│ Three.js/WebGL viewer    │
+│ 3D / Flow / Trace / UI   │
+└──────────────────────────┘
 ```
 
-Future adapters can enrich both the scan and health inputs without replacing the core graph contract.
+The important boundary is the shared graph contract. A Python parser, Java parser, or .NET parser should not need to know anything about Three.js, Flow animation, Security Lens, change impact, or the inspector. It only needs to produce defensible ArchMesh graph evidence.
+
+## Why plugins are the scanner architecture
+
+Language breadth is a core product requirement, but a single scanner containing every parser and every framework rule would become difficult to extend and impossible for outside contributors to reason about safely.
+
+ArchMesh therefore separates two extension types.
+
+### Language plugins
+
+A language plugin owns source parsing and structural evidence for one language or closely related language family.
+
+Examples:
+
+```text
+javascript-typescript
+  ├── .ts / .tsx
+  ├── .js / .jsx
+  ├── .mjs / .cjs
+  ├── imports / exports
+  ├── module resolution
+  └── generic calls / integrations / source evidence
+
+python (future)
+  ├── .py
+  ├── Python import graph
+  ├── modules / packages
+  └── generic call / integration evidence
+
+jvm (future)
+  ├── Java parser
+  ├── Kotlin parser
+  ├── package/import graph
+  └── JVM project/module evidence
+
+dotnet (future)
+  ├── C# parser
+  ├── project/solution graph
+  └── .NET dependency evidence
+```
+
+A plugin may cover more than one file extension or closely related language when a shared parser/runtime makes that boundary useful. The contract is capability-based rather than assuming one package per extension.
+
+### Framework adapters
+
+A framework adapter sits on top of one or more compatible language plugins and adds framework-specific architecture.
+
+Examples:
+
+```text
+JavaScript / TypeScript graph
+        │
+        ├── Next.js adapter
+        │     routes / API handlers / server actions
+        │
+        ├── Angular adapter
+        │     router / DI / components / HttpClient
+        │
+        └── NestJS adapter
+              modules / controllers / providers / guards
+
+Python graph
+        │
+        ├── FastAPI adapter
+        ├── Django adapter
+        └── Flask adapter
+
+JVM graph
+        │
+        └── Spring adapter
+
+.NET graph
+        │
+        └── ASP.NET Core adapter
+```
+
+This prevents framework semantics from being duplicated inside language parsers and lets several frameworks reuse the same structural graph.
+
+## Plugin host contract
+
+The current internal contract lives under `src/plugins/` and is deliberately versioned.
+
+A language plugin declares:
+
+- plugin API version;
+- stable ID and display name;
+- languages and extensions it covers;
+- evidence capabilities it currently produces;
+- a `scan()` function that returns an `ArchGraphData` fragment.
+
+A framework adapter declares:
+
+- plugin API version;
+- stable ID and display name;
+- compatible language-plugin IDs;
+- semantic capabilities it adds;
+- conservative framework detection;
+- an `enrich()` function that contributes nodes, edges, or metadata.
+
+The host merges graph fragments by stable node/edge identity and records active plugin/adapter IDs and capabilities in graph metadata.
+
+A repository may eventually activate multiple language plugins in the same scan. For example:
+
+```text
+repo/
+├── web/       React + TypeScript
+└── api/       Python + FastAPI
+```
+
+can become one ArchMesh graph rather than requiring two unrelated products or viewers.
+
+## External plugin safety
+
+The same internal contract is intended to become the basis for external first-party/community plugins, but ArchMesh must not automatically download or execute arbitrary packages based only on detected file extensions.
+
+Parser plugins necessarily receive local source access. Therefore future external loading should be explicit and auditable, for example through installed/allow-listed packages in project or user configuration.
+
+A future package family may look like:
+
+```text
+@archmesh/plugin-python
+@archmesh/plugin-jvm
+@archmesh/plugin-dotnet
+@archmesh/adapter-angular
+@archmesh/adapter-fastapi
+@archmesh/adapter-spring
+```
+
+Names are illustrative until the public plugin packaging contract is finalized.
+
+The host rejects incompatible plugin API versions rather than attempting best-effort execution.
+
+## Current migration state
+
+The plugin host is now part of the real graph-build path, and the existing JavaScript/TypeScript scanner is registered as the first built-in language plugin.
+
+Some Next.js-specific behavior still lives inside the legacy JavaScript/TypeScript scanner. That behavior should be extracted into the first real framework adapter without changing the graph output. This is an intentional migration step: establish the host and compatibility contract first, then move existing semantics behind it with regression tests.
 
 ## Repository structure
 
 ```text
-ArchMesh/
-├── .github/
-│   └── workflows/
-├── .ux/
-│   ├── CONTEXT.md
-│   ├── DESIGN-SYSTEM.md
-│   └── DECISIONS.md
-├── docs/
-├── public/
-│   └── archmesh.json        # generated locally; gitignored
-├── src/
-│   ├── scanner/
-│   │   ├── cli.ts
-│   │   ├── scan.ts
-│   │   └── scan.test.ts
-│   ├── App.tsx
-│   ├── GraphCanvas.tsx
-│   ├── cli.ts
-│   ├── main.tsx
-│   ├── sample-graph.ts
-│   ├── styles.css
+src/
+├── plugins/
+│   ├── languages/
+│   │   └── javascript-typescript.ts
+│   ├── merge.ts
+│   ├── orchestrator.ts
+│   ├── registry.ts
 │   └── types.ts
-├── AGENTS.md
-├── package.json
-└── vite.config.ts
+├── scanner/
+│   ├── scan.ts
+│   ├── semantics.ts
+│   └── config.ts
+├── projections/
+├── security/
+├── health/
+├── changes/
+├── drift/
+├── editor/
+├── GraphCanvas.tsx
+├── App.tsx
+└── types.ts
 ```
-
-## Runtime modes
-
-### Scan only
-
-```bash
-npm run scan -- /path/to/project
-```
-
-The scanner writes `public/archmesh.json`.
-
-### Scan + viewer
-
-```bash
-npm run atlas -- /path/to/project
-```
-
-The launcher scans the target, starts Vite on port 4242, and opens the browser.
-
-### Viewer only
-
-```bash
-npm run dev
-```
-
-The viewer attempts to load `public/archmesh.json`. If none exists, it falls back to deliberate demo data so the health interactions can still be explored.
-
-## Scanner boundary
-
-`src/scanner/scan.ts` owns source discovery and graph extraction. It should remain focused on evidence that can be defended from source/configuration.
-
-As semantics grow, framework-specific logic should move into adapters rather than turning `scan.ts` into one large collection of unrelated heuristics.
-
-The scanner must not depend on the viewer.
 
 ## Graph boundary
 
-`src/types.ts` defines the core interchange contract. Scanner output, future adapters, runtime health sources, persistence/history, and the viewer should converge on this contract rather than passing framework-specific objects through the application.
+`src/types.ts` defines the core interchange contract. Language plugins, framework adapters, health sources, Git impact, drift, projections, and the viewer converge on this contract rather than passing parser/framework-specific objects through the application.
 
-The graph currently contains:
+The graph contains:
 
 - architectural nodes;
 - directed relationships;
-- health state on nodes and edges;
-- optional path/metadata.
+- health/change/drift state;
+- optional path and evidence metadata.
 
-See `GRAPH_MODEL.md` for details.
+See [`GRAPH_MODEL.md`](GRAPH_MODEL.md).
 
 ## Viewer boundary
 
-`GraphCanvas.tsx` translates `ArchGraphData` into Graphology and Sigma.js rendering attributes. It handles layout, graph selection emphasis, and edge/node visual state.
+`GraphCanvas.tsx` translates `ArchGraphData` into the Three.js/WebGL 3D scene. It owns camera interaction, semantic node rendering, connection rendering, Flow particles, and graph-selection emphasis.
 
-`App.tsx` owns application UI state such as:
+`App.tsx` owns product UI state such as:
 
-- graph source (scan/demo);
-- selected node;
+- active graph/lens;
+- selection and inspector context;
 - search;
-- errors-only filtering;
-- inspector context;
-- high-level health counts.
+- Trace state;
+- Flow state;
+- high-level health/change/security context.
 
-The viewer should not own source-code parsing rules.
+The viewer does not own source parsing rules.
 
-## Layout
+## Progressive architecture
 
-V1 uses ForceAtlas2 after stable deterministic seed positions. Stable seeds prevent random position changes caused solely by selecting a node/re-rendering the graph.
+Rendering every technical entity simultaneously will not scale cognitively even if WebGL can draw it.
 
-Longer term, layout stability matters as much as layout quality because users build a spatial mental model. Incremental scans should preserve positions when entities have stable IDs.
-
-## Graph scale
-
-Rendering every technical entity simultaneously will not scale cognitively even if the rendering engine can handle it.
-
-The long-term answer is progressive architecture:
+ArchMesh uses progressive architecture:
 
 ```text
 system
@@ -148,46 +264,28 @@ system
         → source-level detail
 ```
 
-Clustering, semantic grouping, filtering, and levels of detail are product requirements, not just performance optimizations.
+Lenses, Trace, semantic grouping, filtering, and levels of detail are product requirements, not merely rendering optimizations.
 
-## Health architecture
+## Health and security overlays
 
-Health belongs in the same graph model as static architecture.
+Runtime/build/test evidence and security evidence enrich the same stable graph rather than creating separate disconnected diagrams.
 
-```text
-runtime/build/test evidence
-          │
-          ▼
-   health event adapter
-          │
-          ▼
- known node / known edge
-          │
-     direct error
-          │
-          ▼
- bounded downstream traversal
-          │
-          ▼
-       impacted
-```
+A health source must map evidence to known graph identity. It must not fabricate a relationship merely to create a complete-looking trace.
 
-A future health source must map evidence to known graph identity. It must not fabricate a relationship in order to create a visually complete trace.
+Security follows the same evidence rule: Unknown is preferable to a confident claim that source evidence cannot prove.
 
 ## Persistence
 
-V1 uses a generated JSON file and an in-memory graph. This is intentional.
-
-A database should only be introduced when a concrete requirement demands it, such as large-scale history, cross-repository graphs, or efficient incremental querying. The core architecture should not adopt a hosted graph database simply because the product visualizes a graph.
+ArchMesh currently uses generated local JSON and an in-memory graph. A database should only be introduced when a concrete requirement demands it, such as large-scale history, cross-repository graphs, or efficient incremental querying.
 
 ## AI boundary
 
-ArchMesh does not require an LLM for core scanning, layout, exploration, or health visualization.
+ArchMesh does not require an LLM for parsing, graph construction, layout, exploration, Flow, Trace, health, or security visualization.
 
-AI may later help with natural-language graph filtering, explanation, semantic grouping, or documentation, but it should consume the same graph rather than becoming the authority that invents the graph.
+AI may later consume the graph for natural-language filtering, explanation, semantic grouping, or documentation, but it should not become the authority that invents the graph.
 
 ## Security/privacy boundary
 
-The source repository and generated graph remain local in the default architecture. Future hosted/production integrations must be optional and document exactly what data leaves the machine.
+The source repository and generated graph remain local in the default architecture. Future hosted integrations and external parser plugins must be explicit and document exactly what code/data they can access or transmit.
 
-See `SECURITY.md`.
+See [`../SECURITY.md`](../SECURITY.md).
