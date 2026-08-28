@@ -10,6 +10,8 @@ import { parseCliOptions } from './cli-options.js';
 import { compareGraphs } from './drift/compare.js';
 import { createEmptyDriftGraph } from './drift/empty.js';
 import { sourceEditorPlugin } from './editor/plugin.js';
+import { startupSummaryLines } from './graph-summary.js';
+import { runGuidedOnboarding, shouldRunGuidedOnboarding } from './onboarding.js';
 import { writeGraphOutput } from './output.js';
 import { watchProject } from './watch.js';
 
@@ -24,6 +26,10 @@ ArchMesh — local-first visual software architecture explorer
 Usage:
   archmesh [project] [options]
 
+Interactive start:
+  archmesh
+  archmesh --guided
+
 Examples:
   archmesh .
   archmesh /path/to/project --watch
@@ -32,6 +38,7 @@ Examples:
   archmesh . --editor cursor
 
 Options:
+  --guided               Ask a few plain-language setup questions
   --watch                Rebuild when supported source/config files change
   --changes              Highlight working-tree changes and affected dependents
   --changes-from <ref>   Compare source changes against a Git base ref
@@ -54,7 +61,15 @@ if (rawArgs.includes('--version') || rawArgs.includes('-v')) {
   process.exit(0);
 }
 
-const options = parseCliOptions(rawArgs);
+let effectiveArgs = rawArgs;
+if (shouldRunGuidedOnboarding(rawArgs)) {
+  effectiveArgs = await runGuidedOnboarding();
+} else if (rawArgs.includes('--guided')) {
+  console.error('ArchMesh guided start requires an interactive terminal and cannot be combined with other options.');
+  process.exit(1);
+}
+
+const options = parseCliOptions(effectiveArgs);
 const runtimeRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'archmesh-'));
 const publicDir = path.join(runtimeRoot, 'public');
 const output = path.join(publicDir, 'archmesh.json');
@@ -82,6 +97,7 @@ let previousGraph = initial.graph;
 await writeGraphOutput(output, initial.graph);
 await writeGraphOutput(driftOutput, createEmptyDriftGraph(initial.graph));
 logResult(initial);
+for (const line of startupSummaryLines(initial.graph)) console.log(`  ${line}`);
 
 const server = await createServer({
   root: archMeshRoot,
