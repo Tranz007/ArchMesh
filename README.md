@@ -29,14 +29,17 @@ The core experience runs locally. Your source code does not need to be uploaded 
 
 ArchMesh is pre-1.0, but already supports a useful TypeScript/JavaScript baseline:
 
-- interactive Sigma.js + Graphology graph rendering;
-- deterministic seed positions with ForceAtlas2 layout;
+- interactive Three.js/WebGL 3D architecture graph with orbit, zoom, pan, and fit-to-view controls;
+- semantic node shapes and colors for products, features, services/APIs, routes, data, integrations, components, files, and modules;
+- Architecture Lenses for System Map, Product Areas, Data & Integrations, Routes & APIs, Change Impact, Health, Architecture Drift, and Code Structure;
+- progressive disclosure so the default architecture view prioritizes meaningful product structure instead of opening as a file-level hairball;
+- optional directional Flow mode with animated source-to-target pulses for calls, reads, writes, and integration relationships;
 - search, node inspection, selectable connections, and directional dependency inspection;
 - Architecture, Topology, Changes, Drift, and Code views;
 - feature drill-down without expanding unrelated implementation detail;
 - TypeScript/JavaScript imports, exports, and nested dynamic imports;
 - relative imports and TypeScript `baseUrl` / `paths` aliases;
-- Next.js App Router pages, API routes, route paths, HTTP methods, and server-action evidence;
+- Next.js App Router pages, API routes, route paths, HTTP methods, metadata files, and server-action evidence;
 - internal `fetch('/api/...')` call mapping and external HTTP host discovery;
 - Firebase/Firestore collection read/write/listener relationships;
 - first-class integration nodes for Firebase, Stripe, OpenAI, WorkOS, Resend, and Vercel;
@@ -158,6 +161,28 @@ archmesh . --editor cursor
 ```
 
 ArchMesh validates that the requested source path resolves inside the scanned project before invoking a local editor CLI. Absolute machine paths are not embedded in the graph JSON.
+
+### Animate directional flow
+
+Use **Flow** in the lower-right graph controls to animate relationships that represent actual source-to-target movement.
+
+Flow intentionally animates only:
+
+- `calls` — request/execution flow;
+- `reads` — source reads from a data resource;
+- `writes` — source writes to a data resource;
+- `integrates-with` — application/integration communication.
+
+Static relationships such as `contains`, `imports`, and `depends-on` are not animated as traffic.
+
+When Flow is enabled:
+
+- **Focus** animates eligible incoming and outgoing relationships for the selected node, or the selected connection itself;
+- **All** animates every eligible visible relationship in the current lens/view;
+- pulse direction always follows the graph edge's `source → target` direction;
+- runtime warning/error/impact colors override the normal relation pulse color.
+
+Flow is off by default so large graphs remain calm until movement is useful.
 
 ### Visualize Git change impact
 
@@ -282,10 +307,10 @@ Project source
       │            │            │            │           │
       └────────────┴──────┬─────┴────────────┴───────────┘
                           ▼
-                   health/change overlays
+                 lenses + state overlays
                           │
                           ▼
-                   Sigma.js viewer
+                 Three.js/WebGL 3D viewer
                           ▲
                           │
                    optional watch loop
@@ -315,10 +340,12 @@ src/
 ├── changes/       Git change-impact analysis
 ├── drift/         graph-to-graph structural comparison
 ├── editor/        safe local source-editor navigation
+├── flow           directional runtime/data-flow semantics
+├── lenses         progressive architecture lens projections
 ├── build-graph    shared graph-build pipeline
 ├── watch          live filesystem rebuild pipeline
-├── GraphCanvas    Sigma.js rendering
-└── App             product UI and inspector
+├── GraphCanvas    Three.js/WebGL 3D rendering
+└── App            product UI and inspector
 ```
 
 ## Documentation
