@@ -51,6 +51,8 @@ for (let index = 0; index < systemCount; index += 1) {
   }
 }
 
+const flowDirections = ['source-to-target', 'target-to-source', 'both'];
+
 for (let index = 0; index < systemCount; index += 1) {
   for (const providerOffset of [0, 9, 18]) {
     const provider = (index + providerOffset) % integrationCount;
@@ -61,7 +63,9 @@ for (let index = 0; index < systemCount; index += 1) {
       relation: 'integrates-with',
       health: 'healthy',
       change: 'unchanged',
-      ...(index === 3 && providerOffset === 0 ? { metadata: { flowDirection: 'target-to-source' } } : {}),
+      ...(providerOffset === 0
+        ? { metadata: { flowDirection: flowDirections[index % flowDirections.length] } }
+        : {}),
     });
   }
 }
