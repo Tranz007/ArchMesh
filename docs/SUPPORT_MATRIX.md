@@ -28,11 +28,12 @@ A support level describes ArchMesh's evidence coverage. It does **not** mean Arc
 | **Angular** | **Deep** | TypeScript graph plus `@Component`/`@Injectable` semantics, static templates, constructor/`inject()` DI, static client routes, nested paths, redirects, eager and lazy component targets | `HttpClient`, NgModule/standalone import graphs, guards/resolvers/interceptors, dynamic route config, RxJS/data-flow semantics |
 | **React Native / Expo** | **Structural** | TS/JS dependency graph, components, services, static `fetch()`, supported integrations | Expo Router/navigation, native modules, platform boundaries, app configuration semantics |
 | **Electron** | **Structural** | TS/JS graph across main/renderer source when inside the scanned root | IPC, preload/context bridge, process boundaries are not modeled yet |
-| **Python services / libraries** | **Structural** | `.py` source graph, absolute and relative package imports, root and `src/` layouts, module/service/data classification, selected integration imports | Dynamic imports, Python call graph, packaging/workspace semantics, framework-specific runtime meaning |
+| **Python services / libraries** | **Structural** | `.py` source graph, absolute and relative package imports, root and `src/` layouts, module/service/data classification, selected integration imports | Dynamic imports, Python call graph, packaging semantics, framework-specific runtime meaning |
 | **FastAPI** | **Deep** | Python graph plus FastAPI route decorators, static methods/paths, static `APIRouter` prefixes, semantic handler nodes, selected `Depends(...)` evidence | Router inclusion across modules, dynamic route construction, middleware/security dependency semantics, request/response models |
 | **Django / Flask** | **Structural** | Underlying Python source/import graph and generic structure | Framework routes, handlers/views, middleware, ORM/framework data semantics need dedicated adapters |
-| **npm / pnpm / Yarn monorepos** | **Partial** | Supported JS/TS/Python source under the selected root is walked and merged | Workspace/package boundaries, package-to-package architecture, aliases outside the scan root |
-| **Turborepo / Nx** | **Partial** | Underlying supported source can be scanned | Workspace/project graph and task graph semantics are not imported yet |
+| **npm / Yarn workspaces and common app/service/package layouts** | **Structural** | Supported JS/TS/Python source is merged; `package.json` workspace roots and common `apps/`, `services/`, `packages/`, `projects/`, and library boundaries become first-class System Map nodes; cross-boundary source relationships and external integrations are aggregated | Package-manager dependency declarations, nested/advanced workspace globs, deployment topology, task graphs |
+| **pnpm workspaces** | **Partial** | Common directory conventions are detected, and `package.json` workspaces work when present | `pnpm-workspace.yaml` is not parsed yet; package/task graph semantics remain incomplete |
+| **Turborepo / Nx** | **Partial** | Underlying supported source plus common app/package boundary conventions can be visualized | Turbo/Nx project configuration, task graph, implicit dependencies, generators, affected-project semantics |
 | **Vue / Nuxt** | **Partial** | Standalone `.ts` / `.js` source is scanned | `.vue` single-file components and Nuxt routing/server semantics are not parsed yet |
 | **Svelte / SvelteKit** | **Partial** | Standalone `.ts` / `.js` source is scanned | `.svelte` components and SvelteKit routing/server semantics are not parsed yet |
 | **Astro** | **Partial** | Standalone `.ts` / `.js` source is scanned | `.astro` files, islands, and Astro routing semantics are not parsed yet |
@@ -62,7 +63,7 @@ Files such as `.vue`, `.svelte`, `.astro`, `.java`, `.kt`, `.cs`, `.go`, `.rs`, 
 
 Angular static `templateUrl` files can appear as local graph nodes even though `.html` is not a general-purpose language plugin source format.
 
-Configuration files such as `tsconfig.json`, `jsconfig.json`, `angular.json`, and `archmesh.config.json` can influence scanning even though they are not represented as ordinary source nodes.
+Configuration files such as `tsconfig.json`, `jsconfig.json`, `angular.json`, `package.json`, and `archmesh.config.json` can influence scanning even though they are not represented as ordinary source nodes.
 
 ## Language-plugin capabilities today
 
@@ -97,6 +98,24 @@ The built-in Python plugin uses a real Python syntax grammar and provides:
 - mixed-language graph merging with the JavaScript/TypeScript plugin.
 
 Framework-specific meaning is layered on afterward. The FastAPI adapter currently adds semantic request-facing endpoints while Django/Flask remain structural-only.
+
+## System boundary coverage
+
+ArchMesh can now add a system layer above the source/framework graph when repository evidence supports it.
+
+Current boundary evidence includes:
+
+- `package.json` workspace arrays and `{ "workspaces": { "packages": [...] } }` declarations;
+- common top-level architecture roots such as `apps/`, `services/`, `packages/`, `projects/`, `libs/`, and `libraries/`;
+- nested `package.json` package names as human-readable system labels;
+- Python `pyproject.toml` `[project]` names as labels when present;
+- source-path inheritance so framework-generated semantic entities, such as a FastAPI handler, belong to the same detected service as their source file.
+
+When at least one boundary is detected, the **System Map** can collapse lower-level implementation nodes into first-class system blocks. Cross-boundary `calls`, data relationships, integration relationships, and structural dependencies are aggregated rather than discarded. Health and Git change state bubble up to the relevant system blocks.
+
+Boundary detection is static evidence, not deployment discovery. ArchMesh does not currently claim that a directory/package equals a separately deployed runtime. `pnpm-workspace.yaml`, Nx/Turborepo project/task graphs, container/orchestrator manifests, and cloud deployment topology are separate future evidence sources.
+
+Single-root repositories with no defensible system boundary continue to use the existing product-area System Map rather than inventing fake services.
 
 ## Angular adapter coverage
 
@@ -138,12 +157,13 @@ Once a language plugin contributes graph evidence, the rest of ArchMesh remains 
 - generic health-signal ingestion;
 - architecture drift between live scans;
 - lenses and progressive disclosure;
+- system-boundary aggregation when the repository provides boundary evidence;
 - Flow when a relationship has directional flow semantics;
 - Trace investigation;
 - search and inspection;
 - source editor navigation when the node has a local path.
 
-A mixed repository can activate multiple language plugins in one scan. For example, TypeScript frontend files and Python backend files can coexist in the same `ArchGraphData` graph. Cross-language runtime endpoint matching is a separate semantic layer and should be added only when both sides provide defensible evidence.
+A mixed repository can activate multiple language plugins in one scan. For example, TypeScript frontend files and Python backend files can coexist in the same `ArchGraphData` graph and can belong to separate detected systems. Cross-language runtime endpoint matching remains a separate semantic layer and should be added only when both sides provide defensible evidence.
 
 ## What deeper framework support means
 
@@ -157,8 +177,8 @@ Breadth matters to ArchMesh. The implemented architecture is **language plugin +
 
 A practical next sequence is:
 
-1. improve workspace/system boundaries for npm/pnpm/Yarn workspaces, Nx, Turborepo, and mixed-language services;
-2. add cross-language HTTP endpoint matching when a caller and handler both expose compatible static evidence;
+1. add cross-language HTTP endpoint matching when a caller and handler both expose compatible static evidence;
+2. extend system/workspace evidence with `pnpm-workspace.yaml`, Nx/Turborepo project graphs, and deployment descriptors;
 3. deepen Angular with `HttpClient`, standalone/NgModule metadata, guards/interceptors, and selected RxJS semantics;
 4. deepen Node frameworks: Express/Fastify/Hono, NestJS, React Router/Vite, Expo Router;
 5. add Django/Flask adapters and framework-native component formats such as Vue/Nuxt, Svelte/SvelteKit, Astro;

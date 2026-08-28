@@ -33,6 +33,7 @@ import { projectArchitecture } from './projections/architecture';
 import { projectChanges } from './projections/changes';
 import { projectDrift } from './projections/drift';
 import { projectSecurity } from './projections/security';
+import { projectSystemBoundaries } from './projections/systems';
 import { projectTopology } from './projections/topology';
 import { projectTrace, type TraceDirection } from './projections/trace';
 import { sampleGraph } from './sample-graph';
@@ -218,9 +219,13 @@ export default function App() {
     () => projectArchitecture(data, focusedFeatureId),
     [data, focusedFeatureId],
   );
+  const detectedSystemProjection = useMemo(
+    () => projectSystemBoundaries(data),
+    [data],
+  );
   const systemProjection = useMemo(
-    () => projectSystemOverview(architectureProjection.graph),
-    [architectureProjection.graph],
+    () => detectedSystemProjection ?? projectSystemOverview(architectureProjection.graph),
+    [architectureProjection.graph, detectedSystemProjection],
   );
   const productAreasProjection = useMemo(
     () => projectProductAreas(architectureProjection.graph),
@@ -449,6 +454,9 @@ export default function App() {
   const serverActionCount = selectedNode?.metadata?.serverActionCount;
   const provider = selectedNode?.metadata?.provider;
   const resourceType = selectedNode?.metadata?.resourceType;
+  const systemType = selectedNode?.metadata?.systemType;
+  const systemRoot = selectedNode?.metadata?.systemRoot;
+  const memberCount = positiveCount(selectedNode?.metadata?.memberCount);
   const changedMembers = positiveCount(selectedNode?.metadata?.changedMembers);
   const affectedMembers = positiveCount(selectedNode?.metadata?.affectedMembers);
   const changedFeatures = positiveCount(selectedNode?.metadata?.changedFeatures);
@@ -464,7 +472,7 @@ export default function App() {
         : activeLens === 'health'
           ? 'Find a failing or impacted area…'
           : viewMode === 'architecture'
-            ? 'Find a feature, integration, service…'
+            ? 'Find a system, feature, integration, service…'
             : viewMode === 'topology'
               ? 'Find a feature, collection, integration…'
               : viewMode === 'changes'
@@ -665,6 +673,7 @@ export default function App() {
             ) : (
               <>
                 <span><i className="legend-kind product" />Product</span>
+                <span><i className="legend-kind system" />System</span>
                 <span><i className="legend-kind feature" />Feature</span>
                 <span><i className="legend-kind service" />Service / API</span>
                 <span><i className="legend-kind data" />Data</span>
@@ -727,8 +736,10 @@ export default function App() {
               <SecurityEvidence metadata={selectedNode.metadata} />
               <DriftNote drift={selectedNode.drift} />
 
-              {(routePath || httpMethods || serverActionCount || semanticSource || provider || resourceType) && (
+              {(routePath || httpMethods || serverActionCount || semanticSource || provider || resourceType || systemType || systemRoot) && (
                 <dl className="entity-facts">
+                  {systemType && <div><dt>System type</dt><dd>{String(systemType)}</dd></div>}
+                  {systemRoot && <div><dt>Boundary</dt><dd>{String(systemRoot)}</dd></div>}
                   {routePath && <div><dt>Route</dt><dd>{String(routePath)}</dd></div>}
                   {httpMethods && <div><dt>Methods</dt><dd>{String(httpMethods)}</dd></div>}
                   {serverActionCount && <div><dt>Server actions</dt><dd>{String(serverActionCount)}</dd></div>}
@@ -736,6 +747,12 @@ export default function App() {
                   {resourceType && <div><dt>Resource</dt><dd>{String(resourceType)}</dd></div>}
                   {semanticSource && <div><dt>Grouping</dt><dd>{semanticSource === 'config' ? 'Project config' : 'Detected'}</dd></div>}
                 </dl>
+              )}
+
+              {selectedNode.kind === 'system' && memberCount && (
+                <div className="metadata-grid" aria-label="System contents">
+                  <div><strong>{memberCount}</strong><span>Detected entities</span></div>
+                </div>
               )}
 
               {selectedNode.kind === 'feature' && selectedNode.metadata?.memberCount && (
@@ -765,18 +782,22 @@ export default function App() {
                 <p className="change-note changed">
                   {selectedNode.kind === 'feature'
                     ? 'This feature contains source that changed directly in the selected Git comparison.'
-                    : selectedNode.kind === 'product'
-                      ? 'This project contains one or more features with directly changed source.'
-                      : 'This source file was changed directly in the selected Git comparison.'}
+                    : selectedNode.kind === 'system'
+                      ? 'This system contains source that changed directly in the selected Git comparison.'
+                      : selectedNode.kind === 'product'
+                        ? 'This project contains one or more areas with directly changed source.'
+                        : 'This source file was changed directly in the selected Git comparison.'}
                 </p>
               )}
               {selectedNode.change === 'affected' && (
                 <p className="change-note">
                   {selectedNode.kind === 'feature'
                     ? 'This feature depends on changed source elsewhere. ArchMesh is showing structural impact, not claiming behavior changed.'
-                    : selectedNode.kind === 'product'
-                      ? 'This project is structurally affected by changed code, but contains no directly changed feature in the current projection.'
-                      : 'This entity depends, directly or transitively, on changed code. ArchMesh is showing structural impact, not claiming behavior changed.'}
+                    : selectedNode.kind === 'system'
+                      ? 'This system is structurally affected by changed source elsewhere. ArchMesh is showing dependency impact, not claiming runtime failure.'
+                      : selectedNode.kind === 'product'
+                        ? 'This project is structurally affected by changed code, but contains no directly changed area in the current projection.'
+                        : 'This entity depends, directly or transitively, on changed code. ArchMesh is showing structural impact, not claiming behavior changed.'}
                 </p>
               )}
 

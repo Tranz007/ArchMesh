@@ -14,12 +14,18 @@ function metadataList(graph: ArchGraphData, key: string) {
   return value.split(',').map((item) => item.trim()).filter(Boolean);
 }
 
+function metadataCount(graph: ArchGraphData, key: string) {
+  const value = graph.metadata?.[key];
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
 function plural(count: number, singular: string, pluralValue = `${singular}s`) {
   return `${count} ${count === 1 ? singular : pluralValue}`;
 }
 
 export interface GraphStartupSummary {
   technologies: string[];
+  systems: number;
   routes: number;
   apis: number;
   dataStores: number;
@@ -43,6 +49,7 @@ export function summarizeGraph(graph: ArchGraphData): GraphStartupSummary {
 
   return {
     technologies: technologyIds.map((id) => DISPLAY_NAMES[id] ?? id),
+    systems: metadataCount(graph, 'systemBoundaryCount'),
     routes: graph.nodes.filter((node) => node.kind === 'route').length,
     apis: graph.nodes.filter((node) => node.kind === 'api').length,
     dataStores: graph.nodes.filter((node) => node.kind === 'data').length,
@@ -61,6 +68,7 @@ export function startupSummaryLines(graph: ArchGraphData) {
   }
 
   const architectureParts = [
+    summary.systems > 0 ? plural(summary.systems, 'system') : '',
     summary.routes > 0 ? plural(summary.routes, 'route') : '',
     summary.apis > 0 ? plural(summary.apis, 'API', 'APIs') : '',
     summary.dataStores > 0 ? plural(summary.dataStores, 'data store') : '',

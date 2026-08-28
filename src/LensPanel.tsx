@@ -26,7 +26,7 @@ const lenses: Array<{
   {
     id: 'system',
     title: 'System Map',
-    description: 'Major product areas and the external systems they depend on.',
+    description: 'Apps, services, packages, product areas, and the external systems connecting them.',
     icon: Network,
   },
   {
