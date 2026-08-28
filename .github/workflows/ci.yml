@@ -11,7 +11,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -28,9 +28,6 @@ jobs:
           node-version: '22.18.0'
           cache: npm
           cache-dependency-path: package.json
-
-      - name: Apply viewport-fit race fix
-        run: node scripts/patch-fit-race.mjs
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
@@ -85,7 +82,6 @@ jobs:
             exit 1
           fi
 
-          set +e
           timeout 45s "$chrome" \
             --headless=new \
             --no-sandbox \
@@ -97,16 +93,8 @@ jobs:
             --screenshot=/tmp/archmesh-viewer.png \
             http://localhost:4242/ \
             2> /tmp/chrome-viewer.log
-          chrome_status=$?
-          set -e
 
-          cat /tmp/archmesh-viewer.log
-          cat /tmp/chrome-viewer.log
-          echo "Chrome status: $chrome_status"
           test -s /tmp/archmesh-viewer.png
-
-          cp src/GraphCanvas.tsx /tmp/GraphCanvas.tsx
-          cp public/archmesh.json /tmp/archmesh.json
 
       - name: Upload viewer diagnostics
         if: always()
@@ -117,19 +105,4 @@ jobs:
             /tmp/archmesh-viewer.png
             /tmp/archmesh-viewer.log
             /tmp/chrome-viewer.log
-            /tmp/GraphCanvas.tsx
-            /tmp/archmesh.json
           if-no-files-found: warn
-
-      - name: Commit verified viewport-fit fix
-        if: success()
-        shell: bash
-        run: |
-          if git diff --quiet -- src/GraphCanvas.tsx; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/GraphCanvas.tsx
-          git commit -m "fix: fit graph after viewport measurement"
-          git push origin HEAD:fix/render-root-cause
