@@ -5,7 +5,7 @@ import { applyHealthSignals } from './health/apply.js';
 import { loadHealthSignals } from './health/load.js';
 import type { HealthSignal } from './health/types.js';
 import { collectTypeScriptHealthSignals } from './health/typescript.js';
-import { scanProject } from './scanner/scan.js';
+import { scanProjectWithPlugins } from './plugins/orchestrator.js';
 import type { ArchGraphData } from './types.js';
 
 export interface BuildGraphResult {
@@ -15,7 +15,7 @@ export interface BuildGraphResult {
 }
 
 export async function buildGraph(options: CliOptions): Promise<BuildGraphResult> {
-  const scanned = await scanProject(options.target);
+  const scanned = await scanProjectWithPlugins(options.target);
   const changedPaths = options.changesFrom
     ? await collectChangesFromRef(options.target, options.changesFrom)
     : options.changes
