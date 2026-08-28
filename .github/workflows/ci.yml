@@ -105,6 +105,9 @@ jobs:
           echo "Chrome status: $chrome_status"
           test -s /tmp/archmesh-viewer.png
 
+          cp src/GraphCanvas.tsx /tmp/GraphCanvas.tsx
+          cp public/archmesh.json /tmp/archmesh.json
+
       - name: Upload viewer diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -114,4 +117,6 @@ jobs:
             /tmp/archmesh-viewer.png
             /tmp/archmesh-viewer.log
             /tmp/chrome-viewer.log
+            /tmp/GraphCanvas.tsx
+            /tmp/archmesh.json
           if-no-files-found: warn
