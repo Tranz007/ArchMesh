@@ -224,6 +224,91 @@ Remaining:
 - end-to-end fixtures covering the documented Deep and Structural codebase tiers plus Architecture, Topology, Changes, Drift, Code, Health, Security, Flow, and Trace;
 - README/install docs verified from a clean environment and, after publish, the registry package.
 
+## Slice 9 — Focused architecture Scenes
+
+Status: **working baseline delivered**
+
+Goal: turn the full graph from a codebase terrain map into a fast comprehension tool for one architectural concern at a time.
+
+Delivered:
+
+- candidate Scenes derived generically from integrations, product areas/features, routes/APIs, data entities, services, systems, and components;
+- diversified candidate selection so one node kind cannot consume the entire suggestion list;
+- bounded neighborhood projection with inbound/outbound/both direction and depth controls;
+- focused projections become the graph data passed to the viewer, so fitting frames the active context rather than the entire original graph;
+- locally saved custom views using stable graph IDs and browser storage;
+- selected-node Flow automatically narrows to focus when Flow is enabled;
+- explicit missing-seed state when a saved scene no longer resolves after a rescan.
+
+Post-baseline refinement:
+
+- saved-view rename/edit management;
+- optional manually curated multi-seed Scenes;
+- larger-repository ranking and progressive-disclosure tuning from representative scans.
+
+## Slice 10 — Explainability, path finding, and hypothetical impact
+
+Status: **working baseline delivered**
+
+Delivered:
+
+- multi-depth inbound/outbound/both Trace;
+- `Find path to…` between known entities using only detected graph relationships;
+- explicit no-path states that keep the selected endpoints visible;
+- deterministic `Why are these connected?` evidence in the connection inspector;
+- user-initiated reverse-dependency blast radius for the question `What may be affected if I change this?`;
+- affected-kind and product-area summaries without conflating hypothetical impact, Git change impact, or runtime failure;
+- evidence-preserving path and impact projections.
+
+Post-baseline refinement:
+
+- richer relation-specific path ranking where multiple equally short paths exist;
+- optional export/share of focused path and impact summaries.
+
+## Slice 11 — Journeys and video explanation
+
+Status: **working local baseline delivered**
+
+Goal: make architecture explainable as a repeatable visual sequence, not just a static diagram.
+
+Delivered:
+
+- create an ordered Journey from selected graph entities;
+- locally persist Journey stops;
+- deterministic stop timing and focused graph framing during playback;
+- selected-node context lets an already-enabled Flow overlay emphasize the active part of the Journey;
+- local recording of the graph canvas during Journey playback;
+- MP4 output when the active browser exposes a supported MP4 `MediaRecorder` codec;
+- truthful WebM fallback when MP4 recording is unavailable rather than mislabeled output;
+- no hosted rendering/transcoding requirement for the baseline.
+
+Post-baseline refinement:
+
+- editable stop captions, titles, and timing in the UI;
+- Journey assembly directly from saved Scenes in addition to selected graph entities;
+- richer camera choreography where usability testing shows it improves comprehension;
+- optional deterministic offline encoding if cross-browser MP4 support proves insufficient.
+
+The product contract and acceptance criteria for Slices 9–11 live in [`UNDERSTAND_AND_EXPLAIN.md`](UNDERSTAND_AND_EXPLAIN.md).
+
+## Slice 12 — Capability-aware Health and Drift
+
+Status: **working baseline delivered**
+
+Delivered:
+
+- Health is surfaced only when direct health evidence or an explicitly enabled health adapter backs the graph;
+- Drift is surfaced only when a previous successful graph exists for comparison;
+- root graph metadata describes Health availability and signal sources/counts;
+- drift graphs explicitly distinguish the initial no-baseline state from a real comparison;
+- static Flow is documented and presented as illustrative directionality rather than realtime telemetry;
+- concise capability guidance explains how unavailable Health and Drift become available.
+
+Later:
+
+- optional production/runtime connectors using the same graph identities without changing the local-first core;
+- connector-specific freshness/availability status when realtime evidence is actually present.
+
 ## Post-v0.1 platform work
 
 These are deliberately outside the first release boundary unless user evidence changes the decision:
@@ -246,8 +331,8 @@ These are deliberately outside the first release boundary unless user evidence c
 2. Fix generic scanner/resolution assumptions exposed by those fixtures and keep the public support matrix synchronized.
 3. Add cross-platform CI/support validation.
 4. Benchmark scan/watch performance and implement incremental invalidation where measurements require it.
-5. Improve progressive detail/layout stability on larger repositories.
-6. Validate accessibility and all primary empty/error states.
+5. Improve progressive detail/layout stability on larger repositories, using focused Scenes as a primary comprehension path where appropriate.
+6. Validate accessibility and all primary empty/error/capability-unavailable states.
 7. Finalize registry/package identity, publish, and verify clean installs against both Deep and Structural sample repositories.
 8. Cut v0.1 when the gates in `DEFINITION_OF_DONE.md` are satisfied.
 

@@ -31,15 +31,17 @@ ArchMesh keeps the exact scanned code graph underneath the higher-level views, s
 
 ## What you can see
 
-ArchMesh provides different lenses over the same underlying system:
+ArchMesh provides different lenses and focused workflows over the same underlying system:
 
 - **Architecture** — products, systems, features, services, routes, and implementation structure
 - **Data & integrations** — where information is read, written, and sent outside the system
 - **Routes & APIs** — user-facing and service-facing entry points and the relationships behind them
-- **Trace & Flow** — follow directional relationships through a focused part of the architecture
+- **Scenes** — isolate one meaningful part of the system, such as an integration, feature, route, service, or data boundary
+- **Trace, Path & Flow** — follow directional relationships, find a detected path between two entities, and animate the focused connections
+- **Journeys** — play and locally record an ordered architecture walkthrough, with MP4 used when the browser supports it
 - **Change impact** — see what changed in Git and what may depend on it
-- **Architecture drift** — see structural changes between live scans
-- **Health** — place errors and downstream impact in architectural context
+- **Architecture drift** — see structural changes between live scans when a comparison is actually available
+- **Health** — place attached diagnostics and health signals in architectural context
 - **Security** — surface evidence about sensitive data, boundaries, transport, and unknown controls
 - **Code structure** — inspect the file-level graph when deeper technical detail is useful
 
@@ -101,6 +103,7 @@ Framework adapters
 Shared architecture graph
      │
      ├── architecture + topology
+     ├── focused scenes + paths
      ├── change impact + drift
      ├── health
      └── security evidence
@@ -118,6 +121,7 @@ See **[Architecture](docs/ARCHITECTURE.md)** and **[Graph Model](docs/GRAPH_MODE
 Start with the **[Documentation Guide](docs/README.md)**, or jump directly to:
 
 - [Getting Started](docs/GETTING_STARTED.md)
+- [Understand and Explain Workflows](docs/UNDERSTAND_AND_EXPLAIN.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Codebase Support Matrix](docs/SUPPORT_MATRIX.md)
 - [Configuration](docs/CONFIGURATION.md)

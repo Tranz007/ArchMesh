@@ -8,6 +8,7 @@ If you are new to ArchMesh, start with **[Getting Started](GETTING_STARTED.md)**
 
 - **[Getting Started](GETTING_STARTED.md)** — install, launch, guided mode, watch mode, and common CLI workflows.
 - **[Configuration](CONFIGURATION.md)** — teach ArchMesh project-specific product and feature boundaries.
+- **[Understand and Explain Workflows](UNDERSTAND_AND_EXPLAIN.md)** — focused Scenes, paths, hypothetical impact, saved views, Journeys, and local video recording.
 - **[Trace Investigation](TRACE_INVESTIGATION.md)** — investigate focused inbound and outbound architecture relationships.
 - **[Flow Visualization](FLOW_VISUALIZATION.md)** — understand directional request and data-flow visualization.
 - **[Security Lens](SECURITY_LENS.md)** — security-relevant evidence, sensitive data, boundaries, and conservative security semantics.

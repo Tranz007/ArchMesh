@@ -8,6 +8,7 @@ export function createEmptyDriftGraph(current: ArchGraphData): ArchGraphData {
     edges: [],
     metadata: {
       graphKind: 'drift',
+      driftAvailable: false,
       driftAddedNodes: 0,
       driftRemovedNodes: 0,
       driftModifiedNodes: 0,
