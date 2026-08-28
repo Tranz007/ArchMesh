@@ -12,6 +12,7 @@ export type PluginCapability =
   | 'services'
   | 'routes'
   | 'api-handlers'
+  | 'dependency-injection'
   | 'http-calls'
   | 'data-resources'
   | 'integrations'
