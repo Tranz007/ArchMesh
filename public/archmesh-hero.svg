@@ -1,0 +1,105 @@
+<svg width="1600" height="560" viewBox="0 0 1600 560" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">ArchMesh visual systems network</title>
+  <desc id="desc">A dark, minimal network visualization representing connected software systems, services, data, and flows.</desc>
+  <defs>
+    <linearGradient id="bg" x1="120" y1="40" x2="1480" y2="520" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1020"/>
+      <stop offset="0.52" stop-color="#10182C"/>
+      <stop offset="1" stop-color="#08111A"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(486 268) rotate(12) scale(460 280)">
+      <stop stop-color="#4DD6C6" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#4DD6C6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1120 260) rotate(-6) scale(390 250)">
+      <stop stop-color="#7A6FF0" stop-opacity="0.17"/>
+      <stop offset="1" stop-color="#7A6FF0" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="nodeGlow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="560" rx="28" fill="url(#bg)"/>
+  <rect width="1600" height="560" rx="28" fill="url(#glowA)"/>
+  <rect width="1600" height="560" rx="28" fill="url(#glowB)"/>
+
+  <g opacity="0.16" stroke="#9FB3C8" stroke-width="1">
+    <path d="M120 112H1480"/>
+    <path d="M120 196H1480"/>
+    <path d="M120 280H1480"/>
+    <path d="M120 364H1480"/>
+    <path d="M120 448H1480"/>
+    <path d="M260 70V490"/>
+    <path d="M470 70V490"/>
+    <path d="M680 70V490"/>
+    <path d="M890 70V490"/>
+    <path d="M1100 70V490"/>
+    <path d="M1310 70V490"/>
+  </g>
+
+  <g stroke-linecap="round">
+    <path d="M258 300C360 255 400 192 516 214" stroke="#58D4C7" stroke-opacity="0.56" stroke-width="2.2"/>
+    <path d="M516 214C640 166 742 190 832 247" stroke="#5FC7E8" stroke-opacity="0.50" stroke-width="2.2"/>
+    <path d="M832 247C951 184 1058 193 1180 234" stroke="#7B75F2" stroke-opacity="0.58" stroke-width="2.2"/>
+    <path d="M1180 234C1270 258 1332 313 1388 365" stroke="#8E78F6" stroke-opacity="0.48" stroke-width="2.2"/>
+    <path d="M258 300C360 352 448 382 566 358" stroke="#50BFAF" stroke-opacity="0.42" stroke-width="2"/>
+    <path d="M566 358C692 334 736 274 832 247" stroke="#5EB4D9" stroke-opacity="0.46" stroke-width="2"/>
+    <path d="M566 358C730 406 902 412 1046 348" stroke="#6B8EEA" stroke-opacity="0.40" stroke-width="2"/>
+    <path d="M1046 348C1110 310 1140 269 1180 234" stroke="#7C78F1" stroke-opacity="0.46" stroke-width="2"/>
+    <path d="M408 154C456 172 486 196 516 214" stroke="#55CFC2" stroke-opacity="0.38" stroke-width="1.8"/>
+    <path d="M832 247C862 313 930 352 1046 348" stroke="#6C86EB" stroke-opacity="0.43" stroke-width="1.8"/>
+    <path d="M1180 234C1198 176 1246 145 1312 142" stroke="#8A74F3" stroke-opacity="0.43" stroke-width="1.8"/>
+    <path d="M1046 348C1160 390 1260 405 1388 365" stroke="#7A74F0" stroke-opacity="0.39" stroke-width="1.8"/>
+  </g>
+
+  <g filter="url(#nodeGlow)">
+    <circle cx="258" cy="300" r="10" fill="#55D4C4"/>
+    <circle cx="408" cy="154" r="7" fill="#66C9B9"/>
+    <circle cx="516" cy="214" r="14" fill="#4ED6C8"/>
+    <circle cx="566" cy="358" r="9" fill="#62C7D1"/>
+    <circle cx="832" cy="247" r="16" fill="#65BFEA"/>
+    <circle cx="1046" cy="348" r="10" fill="#7787EE"/>
+    <circle cx="1180" cy="234" r="14" fill="#8177F4"/>
+    <circle cx="1312" cy="142" r="8" fill="#9A78F3"/>
+    <circle cx="1388" cy="365" r="9" fill="#8E78F4"/>
+  </g>
+
+  <g opacity="0.9">
+    <rect x="182" y="267" width="110" height="66" rx="13" fill="#0F1B29" stroke="#55D4C4" stroke-opacity="0.52"/>
+    <rect x="456" y="176" width="122" height="76" rx="14" fill="#101C2A" stroke="#4ED6C8" stroke-opacity="0.58"/>
+    <rect x="765" y="203" width="134" height="88" rx="16" fill="#101C2C" stroke="#65BFEA" stroke-opacity="0.58"/>
+    <rect x="1112" y="194" width="138" height="82" rx="15" fill="#111A31" stroke="#8177F4" stroke-opacity="0.58"/>
+    <rect x="1329" y="332" width="118" height="66" rx="13" fill="#121A31" stroke="#8E78F4" stroke-opacity="0.48"/>
+  </g>
+
+  <g fill="#D8E6F2" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="237" y="294" text-anchor="middle" font-size="15" font-weight="600">Product</text>
+    <text x="517" y="207" text-anchor="middle" font-size="15" font-weight="600">Experience</text>
+    <text x="832" y="238" text-anchor="middle" font-size="15" font-weight="600">Services</text>
+    <text x="1181" y="227" text-anchor="middle" font-size="15" font-weight="600">Data + APIs</text>
+    <text x="1388" y="359" text-anchor="middle" font-size="15" font-weight="600">External</text>
+  </g>
+
+  <g fill="#94AABD" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="12">
+    <text x="237" y="314" text-anchor="middle">features · flows</text>
+    <text x="517" y="229" text-anchor="middle">routes · UI</text>
+    <text x="832" y="261" text-anchor="middle">logic · dependencies</text>
+    <text x="1181" y="249" text-anchor="middle">stores · contracts</text>
+    <text x="1388" y="379" text-anchor="middle">integrations</text>
+  </g>
+
+  <g opacity="0.52">
+    <circle cx="314" cy="116" r="72" fill="#4BD2C4" filter="url(#soft)"/>
+    <circle cx="1265" cy="430" r="80" fill="#7E72F3" filter="url(#soft)"/>
+  </g>
+
+  <g font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="120" y="500" fill="#EAF3FA" font-size="28" font-weight="700" letter-spacing="0.2">ArchMesh</text>
+    <text x="120" y="530" fill="#8FA7BB" font-size="16">Make the system visible.</text>
+  </g>
+</svg>
