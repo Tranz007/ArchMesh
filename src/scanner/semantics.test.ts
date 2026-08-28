@@ -7,32 +7,32 @@ function source(text: string) {
 }
 
 describe('collectHttpCalls', () => {
-  it('detects static fetch URLs and methods', () => {
+  it('detects static fetch URLs, methods, and payload fields', () => {
     const calls = collectHttpCalls(source(`
-      fetch('/api/story/publish', { method: 'POST' });
+      fetch('/api/catalog/publish', { method: 'POST', body: JSON.stringify({ title, ownerId }) });
       fetch('https://example.com/status');
     `));
 
     expect(calls).toEqual([
-      { url: '/api/story/publish', method: 'POST' },
-      { url: 'https://example.com/status', method: 'GET' },
+      { url: '/api/catalog/publish', method: 'POST', bodyFields: ['title', 'ownerId'] },
+      { url: 'https://example.com/status', method: 'GET', bodyFields: [] },
     ]);
   });
 });
 
 describe('collectFirestoreAccesses', () => {
-  it('detects reads, writes, and listeners against static collection names', () => {
+  it('detects reads, writes, listeners, and statically visible write fields', () => {
     const accesses = collectFirestoreAccesses(source(`
-      getDocs(collection(db, 'stories'));
-      setDoc(doc(db, 'stories', storyId), payload);
-      onSnapshot(query(collection(db, 'companies')), listener);
+      getDocs(collection(db, 'catalogItems'));
+      setDoc(doc(db, 'catalogItems', itemId), { title, ownerId });
+      onSnapshot(query(collection(db, 'organizations')), listener);
     `));
 
     expect(accesses).toEqual(
       expect.arrayContaining([
-        { collection: 'stories', relation: 'reads', operation: 'getDocs' },
-        { collection: 'stories', relation: 'writes', operation: 'setDoc' },
-        { collection: 'companies', relation: 'reads', operation: 'onSnapshot' },
+        { collection: 'catalogItems', relation: 'reads', operation: 'getDocs', fields: [] },
+        { collection: 'catalogItems', relation: 'writes', operation: 'setDoc', fields: ['title', 'ownerId'] },
+        { collection: 'organizations', relation: 'reads', operation: 'onSnapshot', fields: [] },
       ]),
     );
   });
