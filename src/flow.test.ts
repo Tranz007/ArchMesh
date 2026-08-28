@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { flowParticleCount, flowParticleSpeed, isDirectionalFlowRelation, shouldAnimateFlowEdge } from './flow';
+import {
+  flowDirectionLabel,
+  flowParticleCount,
+  flowParticleSpeed,
+  isDirectionalFlowRelation,
+  shouldAnimateFlowEdge,
+} from './flow';
 
 const callEdge = {
   id: 'edge:calls',
@@ -25,11 +31,11 @@ describe('directional flow', () => {
     expect(isDirectionalFlowRelation('contains')).toBe(false);
   });
 
-  it('animates all eligible edges in all-flow mode', () => {
+  it('keeps all-flow visually lightweight', () => {
     const selection = { enabled: true, scope: 'all' as const };
     expect(shouldAnimateFlowEdge(callEdge, selection)).toBe(true);
     expect(shouldAnimateFlowEdge(dependencyEdge, selection)).toBe(false);
-    expect(flowParticleCount(callEdge, selection)).toBe(2);
+    expect(flowParticleCount(callEdge, selection)).toBe(1);
   });
 
   it('limits focus flow to the selected node neighborhood', () => {
@@ -40,17 +46,23 @@ describe('directional flow', () => {
     };
     expect(shouldAnimateFlowEdge(callEdge, selection)).toBe(true);
     expect(shouldAnimateFlowEdge({ ...callEdge, id: 'edge:other', source: 'node:x' }, selection)).toBe(false);
-    expect(flowParticleCount(callEdge, selection)).toBe(4);
+    expect(flowParticleCount(callEdge, selection)).toBe(2);
   });
 
-  it('gives a selected edge a stronger pulse and relation-specific speed', () => {
+  it('uses only a few particles for a selected edge', () => {
     const selection = {
       enabled: true,
       scope: 'focus' as const,
       selectedEdgeId: callEdge.id,
     };
-    expect(flowParticleCount(callEdge, selection)).toBe(6);
-    expect(flowParticleSpeed('calls')).toBeGreaterThan(flowParticleSpeed('integrates-with'));
+    expect(flowParticleCount(callEdge, selection)).toBe(3);
+  });
+
+  it('moves read data from the resource back to the reader', () => {
+    expect(flowParticleSpeed('reads')).toBeLessThan(0);
+    expect(flowDirectionLabel('reads')).toBe('target → source');
+    expect(flowParticleSpeed('writes')).toBeGreaterThan(0);
+    expect(flowDirectionLabel('writes')).toBe('source → target');
   });
 
   it('does not animate when flow is disabled', () => {
