@@ -1,4 +1,4 @@
-import type { ArchEdge } from './types';
+import type { ArchEdge, GraphMetadata } from './types';
 
 export type FlowScope = 'focus' | 'all';
 export type FlowDirection = 'source-to-target' | 'target-to-source' | 'both' | 'unknown';
@@ -8,6 +8,13 @@ const directionalFlowRelations = new Set<ArchEdge['relation']>([
   'reads',
   'writes',
   'integrates-with',
+]);
+
+const flowDirections = new Set<FlowDirection>([
+  'source-to-target',
+  'target-to-source',
+  'both',
+  'unknown',
 ]);
 
 export interface FlowSelection {
@@ -23,6 +30,13 @@ export interface FlowEdgeLike {
   target: string;
   relation: ArchEdge['relation'];
   flowDirection?: FlowDirection;
+}
+
+export function metadataFlowDirection(metadata?: GraphMetadata): FlowDirection | undefined {
+  const value = metadata?.flowDirection;
+  return typeof value === 'string' && flowDirections.has(value as FlowDirection)
+    ? value as FlowDirection
+    : undefined;
 }
 
 export function flowDirectionForEdge(edge: Pick<FlowEdgeLike, 'relation' | 'flowDirection'>): FlowDirection {
@@ -43,6 +57,25 @@ export function mergeFlowDirection(
   if (left === 'unknown') return right;
   if (right === 'unknown') return left;
   return 'both';
+}
+
+/**
+ * Keep an aggregation's preferred metadata intact while combining directional
+ * evidence from every relationship that collapsed into the same visible edge.
+ */
+export function withMergedFlowDirection(
+  preferred?: GraphMetadata,
+  incoming?: GraphMetadata,
+): GraphMetadata | undefined {
+  const direction = mergeFlowDirection(
+    metadataFlowDirection(preferred),
+    metadataFlowDirection(incoming),
+  );
+  if (!preferred && !direction) return undefined;
+  return {
+    ...(preferred ?? {}),
+    ...(direction ? { flowDirection: direction } : {}),
+  };
 }
 
 export function flowDirectionFromReadWrite(hasRead: boolean, hasWrite: boolean): FlowDirection | undefined {
