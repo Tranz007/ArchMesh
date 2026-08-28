@@ -224,6 +224,64 @@ Remaining:
 - end-to-end fixtures covering the documented Deep and Structural codebase tiers plus Architecture, Topology, Changes, Drift, Code, Health, Security, Flow, and Trace;
 - README/install docs verified from a clean environment and, after publish, the registry package.
 
+## Slice 9 — Focused architecture Scenes
+
+Status: **next product capability**
+
+Goal: turn the full graph from a codebase terrain map into a fast comprehension tool for one architectural concern at a time.
+
+Planned:
+
+- automatically derive candidate Scenes from integrations, product areas/features, routes/APIs, data entities, services, packages, and other strong graph seeds;
+- bounded neighborhood projection with direction and depth controls;
+- selected-context framing so `Fit` means the active context rather than always the whole codebase;
+- locally saved custom views using stable graph IDs and browser storage;
+- scene-aware Flow that emphasizes the isolated relationships instead of creating whole-graph visual noise;
+- clear empty/no-longer-present states when a saved scene no longer resolves after a rescan.
+
+## Slice 10 — Explainability, path finding, and hypothetical impact
+
+Status: **next product capability**
+
+Planned:
+
+- multi-depth inbound/outbound/both Trace;
+- `Find path to…` between known entities using only detected graph relationships;
+- deterministic `Why are these connected?` evidence in the connection inspector;
+- user-initiated reverse-dependency blast radius for the question `What may be affected if I change this?`;
+- affected-kind and product-area summaries without conflating hypothetical impact, Git change impact, or runtime failure;
+- evidence-preserving path/impact projections with explicit no-path states.
+
+## Slice 11 — Journeys and video explanation
+
+Status: **next product capability**
+
+Goal: make architecture explainable as a repeatable visual sequence, not just a static diagram.
+
+Planned:
+
+- create an ordered Journey from selected nodes or saved Scenes;
+- stop titles, optional captions, duration, and Flow emphasis;
+- deterministic camera movement and focused graph framing during playback;
+- local recording of the graph viewport during Journey playback;
+- MP4 output when the active browser exposes a supported MP4 recording codec;
+- truthful WebM fallback when MP4 recording is unavailable rather than mislabeled output;
+- no hosted rendering/transcoding requirement for the baseline.
+
+The product contract and acceptance criteria for Slices 9–11 live in [`UNDERSTAND_AND_EXPLAIN.md`](UNDERSTAND_AND_EXPLAIN.md).
+
+## Slice 12 — Capability-aware Health and Drift
+
+Status: **next product capability**
+
+Planned:
+
+- surface Health only when direct health evidence or an explicitly enabled health adapter backs the graph;
+- surface Drift only when a previous successful graph exists for comparison;
+- never imply that static Flow animation is realtime telemetry;
+- show concise capability guidance when a lens is unavailable instead of presenting controls that appear to do nothing;
+- prepare stable capability metadata for later optional runtime connectors.
+
 ## Post-v0.1 platform work
 
 These are deliberately outside the first release boundary unless user evidence changes the decision:
@@ -246,8 +304,8 @@ These are deliberately outside the first release boundary unless user evidence c
 2. Fix generic scanner/resolution assumptions exposed by those fixtures and keep the public support matrix synchronized.
 3. Add cross-platform CI/support validation.
 4. Benchmark scan/watch performance and implement incremental invalidation where measurements require it.
-5. Improve progressive detail/layout stability on larger repositories.
-6. Validate accessibility and all primary empty/error states.
+5. Improve progressive detail/layout stability on larger repositories, including focused Scene behavior where it materially improves the default experience.
+6. Validate accessibility and all primary empty/error/capability-unavailable states.
 7. Finalize registry/package identity, publish, and verify clean installs against both Deep and Structural sample repositories.
 8. Cut v0.1 when the gates in `DEFINITION_OF_DONE.md` are satisfied.
 
