@@ -14,6 +14,8 @@ import type { ArchitectureLens } from './lenses';
 interface LensPanelProps {
   activeLens: ArchitectureLens;
   hiddenNodes?: number;
+  healthAvailable?: boolean;
+  driftAvailable?: boolean;
   onSelect: (lens: ArchitectureLens) => void;
 }
 
@@ -79,7 +81,19 @@ const lenses: Array<{
   },
 ];
 
-export function LensPanel({ activeLens, hiddenNodes = 0, onSelect }: LensPanelProps) {
+export function LensPanel({
+  activeLens,
+  hiddenNodes = 0,
+  healthAvailable = false,
+  driftAvailable = false,
+  onSelect,
+}: LensPanelProps) {
+  const availableLenses = lenses.filter((lens) => {
+    if (lens.id === 'health') return healthAvailable;
+    if (lens.id === 'drift') return driftAvailable;
+    return true;
+  });
+
   return (
     <div className="lens-panel">
       <div className="lens-panel-heading">
@@ -89,7 +103,7 @@ export function LensPanel({ activeLens, hiddenNodes = 0, onSelect }: LensPanelPr
       </div>
 
       <div className="lens-grid" role="list" aria-label="Architecture lenses">
-        {lenses.map((lens) => {
+        {availableLenses.map((lens) => {
           const Icon = lens.icon;
           const active = activeLens === lens.id;
           return (
@@ -110,6 +124,13 @@ export function LensPanel({ activeLens, hiddenNodes = 0, onSelect }: LensPanelPr
           );
         })}
       </div>
+
+      {(!healthAvailable || !driftAvailable) && (
+        <div className="lens-capability-note" aria-label="Unavailable architecture capabilities">
+          {!healthAvailable && <p><Activity size={12} /> Health appears when diagnostics or health signals are attached to the local scan.</p>}
+          {!driftAvailable && <p><History size={12} /> Drift appears after a watch session has two successful scans to compare.</p>}
+        </div>
+      )}
 
       {activeLens === 'system' && hiddenNodes > 0 && (
         <p className="lens-disclosure-note">
