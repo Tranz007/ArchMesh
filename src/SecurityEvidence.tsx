@@ -1,4 +1,5 @@
 import { CircleHelp, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { ConnectionEvidence } from './ConnectionEvidence';
 import type { GraphMetadata } from './types';
 
 function humanize(value: unknown) {
@@ -47,7 +48,8 @@ export function SecurityEvidence({ metadata }: SecurityEvidenceProps) {
     || Boolean(storage)
     || metadata.securityExternalBoundary === true;
 
-  if (!hasEvidence) return null;
+  const connectionEvidence = <ConnectionEvidence metadata={metadata} />;
+  if (!hasEvidence) return connectionEvidence;
 
   const isRisk = metadata.securityTransport === 'cleartext'
     || metadata.securitySeverity === 'high'
@@ -57,40 +59,43 @@ export function SecurityEvidence({ metadata }: SecurityEvidenceProps) {
   const tone = isRisk ? 'risk' : isKnownTls ? 'protected' : 'unknown';
 
   return (
-    <section className={`security-evidence ${tone}`} aria-label="Security evidence">
-      <div className="security-evidence-title">
-        <Icon size={14} />
-        Security evidence
-      </div>
-
-      {finding && (
-        <div className="security-finding">
-          <strong>{finding}</strong>
-          {severity && <span>{severity}</span>}
+    <>
+      {connectionEvidence}
+      <section className={`security-evidence ${tone}`} aria-label="Security evidence">
+        <div className="security-evidence-title">
+          <Icon size={14} />
+          Security evidence
         </div>
-      )}
 
-      <dl>
-        {fields && <div><dt>Sensitive fields</dt><dd>{fields}</dd></div>}
-        {categories && <div><dt>Data class</dt><dd>{categories}</dd></div>}
-        {transport && <div><dt>Transport</dt><dd>{transport}</dd></div>}
-        {boundary && <div><dt>Boundary</dt><dd>{boundary}</dd></div>}
-        {storage && <div><dt>At rest</dt><dd>{storage}</dd></div>}
-      </dl>
+        {finding && (
+          <div className="security-finding">
+            <strong>{finding}</strong>
+            {severity && <span>{severity}</span>}
+          </div>
+        )}
 
-      {(sensitiveEvidence || transportEvidence || storageEvidence) && (
-        <div className="security-evidence-notes">
-          {sensitiveEvidence && <p>{sensitiveEvidence}</p>}
-          {transportEvidence && <p>{transportEvidence}</p>}
-          {storageEvidence && <p>{storageEvidence}</p>}
-        </div>
-      )}
+        <dl>
+          {fields && <div><dt>Sensitive fields</dt><dd>{fields}</dd></div>}
+          {categories && <div><dt>Data class</dt><dd>{categories}</dd></div>}
+          {transport && <div><dt>Transport</dt><dd>{transport}</dd></div>}
+          {boundary && <div><dt>Boundary</dt><dd>{boundary}</dd></div>}
+          {storage && <div><dt>At rest</dt><dd>{storage}</dd></div>}
+        </dl>
 
-      {(metadata.securityTransport === 'unknown' || metadata.securityStorage === 'unknown') && (
-        <p className="security-unknown-note">
-          Unknown means ArchMesh cannot prove this control from repository evidence. It does not mean the control is absent.
-        </p>
-      )}
-    </section>
+        {(sensitiveEvidence || transportEvidence || storageEvidence) && (
+          <div className="security-evidence-notes">
+            {sensitiveEvidence && <p>{sensitiveEvidence}</p>}
+            {transportEvidence && <p>{transportEvidence}</p>}
+            {storageEvidence && <p>{storageEvidence}</p>}
+          </div>
+        )}
+
+        {(metadata.securityTransport === 'unknown' || metadata.securityStorage === 'unknown') && (
+          <p className="security-unknown-note">
+            Unknown means ArchMesh cannot prove this control from repository evidence. It does not mean the control is absent.
+          </p>
+        )}
+      </section>
+    </>
   );
 }
