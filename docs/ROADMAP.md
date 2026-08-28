@@ -43,6 +43,42 @@ Remaining before or near v0.1:
 - large-repository progressive detail;
 - measured layout stability/performance improvements.
 
+## Slice 2.5 — Codebase breadth and framework adapters
+
+Status: **cross-framework structural baseline exists; validation expansion required for v0.1**
+
+Delivered:
+
+- first-class scanning of `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, and `.cjs` source;
+- generic import/dependency architecture usable across many JavaScript/TypeScript repository shapes;
+- generic component/service/data classification by convention;
+- shared static `fetch()` and integration evidence independent of Next.js;
+- Deep Next.js App Router semantics layered on top of the shared source graph;
+- explicit public support tiers: Deep, Structural, Partial, and Planned;
+- public [`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) describing current behavior and gaps.
+
+Required before v0.1:
+
+- representative fixture/e2e validation for **Next.js** as a Deep path;
+- representative fixture/e2e validation for **React + Vite**, **Angular**, and a **Node.js service** as distinct Structural paths;
+- correct any generic scanner assumptions those repositories expose;
+- verify partial stacks fail gracefully when primary framework file formats are unsupported;
+- promote support levels only when fixtures or representative repositories prove the claim.
+
+High-priority JavaScript/TypeScript adapters after the structural baseline is proven:
+
+- Angular Router, standalone/NgModule metadata, dependency injection, templates, and `HttpClient`;
+- Express/Fastify/Hono route and middleware semantics;
+- NestJS controllers/modules/providers/DI/guards/interceptors;
+- React Router/Vite application routing semantics;
+- Expo Router/navigation and selected native-module boundaries;
+- Vue/Nuxt SFC and routing/server semantics;
+- Svelte/SvelteKit component and routing/server semantics;
+- Astro components/islands/routing semantics;
+- workspace/package architecture for npm/pnpm/Yarn, Nx, and Turborepo.
+
+The scanner should evolve toward **language parser + framework adapters + shared graph model**, not a monolithic collection of framework special cases.
+
 ## Slice 3 — Data and integration topology
 
 Status: **working baseline delivered**
@@ -185,7 +221,7 @@ Remaining:
 - progressive detail that avoids an unusable default file hairball;
 - stable identity/layout checks across rescans;
 - narrow viewport and accessibility review of all primary views;
-- end-to-end fixture covering Architecture, Topology, Changes, Drift, Code, and Health;
+- end-to-end fixtures covering the documented Deep and Structural codebase tiers plus Architecture, Topology, Changes, Drift, Code, Health, Security, Flow, and Trace;
 - README/install docs verified from a clean environment and, after publish, the registry package.
 
 ## Post-v0.1 platform work
@@ -202,16 +238,17 @@ These are deliberately outside the first release boundary unless user evidence c
 - generated architecture summaries;
 - desktop packaging;
 - optional collaboration/server mode;
-- broad language/framework coverage.
+- non-JavaScript/TypeScript language families and deeper framework adapters beyond the validated support matrix.
 
 ## Near-term v0.1 sequence
 
-1. Build a representative end-to-end fixture and smoke-test path.
-2. Add cross-platform CI/support validation.
-3. Benchmark scan/watch performance and implement incremental invalidation where measurements require it.
-4. Improve progressive detail/layout stability on larger repositories.
-5. Validate accessibility and all primary empty/error states.
-6. Finalize registry/package identity, publish, and verify a clean registry install.
-7. Cut v0.1 when the gates in `DEFINITION_OF_DONE.md` are satisfied.
+1. Build the multi-framework representative fixture suite: Next.js, React + Vite, Angular, and Node.js service shapes.
+2. Fix generic scanner/resolution assumptions exposed by those fixtures and keep the public support matrix synchronized.
+3. Add cross-platform CI/support validation.
+4. Benchmark scan/watch performance and implement incremental invalidation where measurements require it.
+5. Improve progressive detail/layout stability on larger repositories.
+6. Validate accessibility and all primary empty/error states.
+7. Finalize registry/package identity, publish, and verify clean installs against both Deep and Structural sample repositories.
+8. Cut v0.1 when the gates in `DEFINITION_OF_DONE.md` are satisfied.
 
 The release decision should be gate-driven, not roadmap-length-driven.

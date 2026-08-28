@@ -55,7 +55,7 @@ A change is done only when all applicable conditions below are true.
 ### Documentation
 
 - README is updated when public usage changes.
-- Relevant product, architecture, scanner, graph, health, development, or configuration docs are updated in the same change.
+- Relevant product, architecture, scanner, graph, health, development, configuration, or support-matrix docs are updated in the same change.
 - Consequential design/architecture decisions are recorded in `.ux/DECISIONS.md` when appropriate.
 - Roadmap status is updated when a planned capability becomes delivered.
 
@@ -90,19 +90,24 @@ The release is done when the following gates are met.
 - Configuration remains optional and additive.
 - Startup errors explain what the user needs to fix.
 
-## B. Supported baseline
+## B. Supported baseline and codebase breadth
 
-v0.1 must clearly define and reliably support its first target rather than claiming universal language support.
+v0.1 must clearly define support tiers and prove that ArchMesh is useful across more than one framework shape rather than implying universal support.
 
 Required baseline:
 
-- TypeScript and JavaScript repositories;
-- React/Next.js projects as a first-class path;
-- relative and TypeScript path-alias module resolution;
-- routes, APIs, components, services, data resources, and integrations at a useful architectural level;
-- generic projects still receive a useful Code/Architecture graph even when framework-specific semantics are unavailable.
+- the public [`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) accurately describes current coverage and known gaps;
+- `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, and `.cjs` repositories are part of the supported source baseline;
+- Next.js App Router is validated as a **Deep** framework path;
+- at least representative **React + Vite**, **Angular**, and **Node.js service** repositories are validated as useful **Structural** paths;
+- relative and TypeScript path-alias module resolution works on the documented baseline;
+- routes, APIs, components, services, data resources, and integrations appear when supported evidence exists;
+- generic JavaScript/TypeScript projects still receive a useful Code/Architecture graph even when framework-specific semantics are unavailable;
+- partial stacks degrade honestly: unsupported primary file formats are skipped rather than fabricated into the graph.
 
-Anything outside the documented baseline may work, but is not part of the v0.1 support promise.
+The support matrix is a product contract. A framework moves from Partial to Structural or Structural to Deep only when representative fixtures or repository validation prove the claimed behavior.
+
+Anything outside the documented matrix may work, but is not part of the v0.1 support promise.
 
 ## C. Core product workflows
 
@@ -160,13 +165,15 @@ Incremental scanning is strongly preferred for v0.1 if full rescans fail the mea
 - CI passes on the supported Node versions.
 - CI covers the supported operating-system matrix or equivalent platform-specific tests exist.
 - Typecheck, tests, production build, and self-scan are mandatory release checks.
-- A representative fixture/e2e repository validates the main scanner/viewer path.
+- Representative fixture/e2e repositories validate the main scanner/viewer path across the documented Deep and Structural support tiers.
+- At minimum, the release suite covers Next.js plus distinct React/Vite, Angular, and Node.js repository shapes.
 - Known limitations are documented rather than hidden.
 - No critical or high-severity known defect remains in a core workflow.
 
 ## I. Documentation and onboarding
 
 - README accurately describes current behavior.
+- The codebase support matrix is visible from the README and agrees with scanner behavior and automated fixtures.
 - Installation and first-run instructions work from a clean environment.
 - CLI options are documented.
 - Configuration, health signals, change impact, drift, privacy, development, and contribution docs are current.
@@ -179,7 +186,7 @@ Incremental scanning is strongly preferred for v0.1 if full rescans fail the mea
 - Versioning and changelog are ready.
 - License and contribution/security docs are present.
 - The release can be tagged from a green `main` branch.
-- A clean install of the published package passes a smoke test against at least one representative repository.
+- A clean install of the published package passes smoke tests against at least one Deep-support repository and one distinct Structural-support repository.
 
 ---
 
@@ -196,10 +203,12 @@ These may be valuable later, but they must not hold the first release hostage un
 - cross-repository architecture;
 - persistent cloud history;
 - support for every language/framework;
+- Deep semantic adapters for every JavaScript/TypeScript framework;
+- non-JavaScript/TypeScript language families such as Python, Java/Kotlin, C#/.NET, Go, Rust, Ruby, or PHP;
 - desktop packaging;
 - enterprise administration.
 
-The first release should be a strong local developer tool before it becomes a platform.
+The first release should be a strong local developer tool with demonstrated breadth across common JavaScript/TypeScript repository shapes before it becomes a platform.
 
 ---
 

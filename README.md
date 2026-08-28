@@ -26,6 +26,33 @@ ArchMesh makes those relationships visible while keeping the exact scanned code 
 
 The core experience runs locally. Your source code does not need to be uploaded to an ArchMesh service.
 
+## What can ArchMesh scan?
+
+ArchMesh uses layered support. A codebase does **not** need a dedicated framework adapter before it can produce a useful graph: the current scanner structurally understands `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, and `.cjs` across many JavaScript/TypeScript repositories. Dedicated adapters add deeper framework-specific architecture on top of that source graph.
+
+| Codebase / framework | Support today | Current coverage |
+| --- | --- | --- |
+| **Next.js App Router** | **Deep** | Source graph + pages, API routes, route paths, HTTP methods, server-action evidence, internal API calls |
+| **React + Vite / CRA** | **Structural** | Source/import graph, components/services, static fetches, integrations |
+| **Node.js** | **Structural** | Modules, imports, services/repositories/adapters, static fetches, integrations |
+| **Express / Fastify / Hono** | **Structural** | Underlying JS/TS graph; framework route/middleware semantics are not first-class yet |
+| **NestJS** | **Structural** | TypeScript graph; controllers/modules/providers/DI semantics are not first-class yet |
+| **Angular** | **Structural** | TypeScript graph and generic component/service structure; Router, DI, templates, and `HttpClient` semantics need an adapter |
+| **React Native / Expo** | **Structural** | JS/TS graph, components/services, static fetches; navigation/native boundaries need an adapter |
+| **Electron** | **Structural** | JS/TS graph across main/renderer source; IPC/process boundaries are not modeled yet |
+| **npm / pnpm / Yarn monorepos, Nx, Turborepo** | **Partial** | Source inside the selected root can scan; workspace/package boundaries need deeper semantics |
+| **Vue / Nuxt** | **Partial** | Standalone JS/TS scans; `.vue` SFCs and Nuxt semantics are not parsed yet |
+| **Svelte / SvelteKit** | **Partial** | Standalone JS/TS scans; `.svelte` files and SvelteKit semantics are not parsed yet |
+| **Astro** | **Partial** | Standalone JS/TS scans; `.astro` files and Astro semantics are not parsed yet |
+| **Python / Django / FastAPI / Flask** | **Planned** | Python parser + framework adapters required |
+| **Java / Kotlin / Spring** | **Planned** | JVM parser/project graph + Spring semantics required |
+| **C# / .NET / ASP.NET Core** | **Planned** | C# project graph + .NET framework semantics required |
+| **Go / Rust / Ruby / PHP** | **Planned** | Language parsers and framework adapters required |
+
+**Deep** means ArchMesh understands important framework-specific architecture. **Structural** means the source/dependency graph is useful today but framework-specific semantics are incomplete. **Partial** means only supported JS/TS portions of the repository are currently parsed. **Planned** means the primary source language is not scanned yet.
+
+See the full [Codebase Support Matrix](docs/SUPPORT_MATRIX.md) for exact file support, known gaps, monorepo behavior, and the framework-adapter expansion plan.
+
 ## Current capabilities
 
 ArchMesh is pre-1.0, but already supports a useful TypeScript/JavaScript baseline:
@@ -406,6 +433,7 @@ src/
 - [Architecture](docs/ARCHITECTURE.md)
 - [Graph model](docs/GRAPH_MODEL.md)
 - [Scanner](docs/SCANNER.md)
+- [Codebase support matrix](docs/SUPPORT_MATRIX.md)
 - [Configuration](docs/CONFIGURATION.md)
 - [Trace investigation](docs/TRACE_INVESTIGATION.md)
 - [Flow visualization](docs/FLOW_VISUALIZATION.md)
