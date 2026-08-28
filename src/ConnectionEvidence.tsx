@@ -6,6 +6,12 @@ function text(metadata: GraphMetadata | undefined, key: string) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+function callerLabel(value?: string) {
+  if (value === 'angular-httpclient') return 'Angular HttpClient';
+  if (value === 'fetch') return 'fetch()';
+  return value;
+}
+
 export function ConnectionEvidence({ metadata }: { metadata?: GraphMetadata }) {
   if (metadata?.endpointMatch !== 'static-method-path') return null;
 
@@ -13,6 +19,7 @@ export function ConnectionEvidence({ metadata }: { metadata?: GraphMetadata }) {
   const framework = text(metadata, 'matchedFramework');
   const sourceLanguage = text(metadata, 'sourceLanguage');
   const targetLanguage = text(metadata, 'targetLanguage');
+  const caller = callerLabel(text(metadata, 'callerEvidence'));
   const crossLanguage = metadata?.crossLanguage === true;
   const crossSystem = metadata?.crossSystem === true;
 
@@ -23,6 +30,7 @@ export function ConnectionEvidence({ metadata }: { metadata?: GraphMetadata }) {
         ArchMesh connected this request to one semantic API handler using a statically visible HTTP method and path.
       </p>
       <dl className="entity-facts">
+        {caller && <div><dt>Caller evidence</dt><dd>{caller}</dd></div>}
         {route && <div><dt>Matched route</dt><dd>{route}</dd></div>}
         {framework && <div><dt>Framework</dt><dd>{framework}</dd></div>}
         {sourceLanguage && targetLanguage && (
