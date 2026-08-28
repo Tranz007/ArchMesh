@@ -4,16 +4,14 @@ ArchMesh flow animation is a visualization of **detected relationship direction*
 
 ## Direction semantics
 
-| Relationship | Detected direction | Current animation support | Meaning |
-| --- | --- | --- | --- |
-| `calls` | source → target | Animated | Caller initiates a request to the target. |
-| `writes` | source → target | Animated | Data leaves the source and is written to the target. |
-| `reads` | target → source | Evidence shown; reverse pulse deferred | Data is read from the target into the source. |
-| `integrates-with` | evidence-dependent | Source → target can animate when supplied to the renderer; reverse/both remain evidence-only | An import alone proves usage, not traffic direction. |
+| Relationship | Animated direction | Meaning |
+| --- | --- | --- |
+| `calls` | source → target | Caller initiates a request to the target. |
+| `writes` | source → target | Data leaves the source and is written to the target. |
+| `reads` | target → source | Data is read from the target into the source. |
+| `integrates-with` | evidence-dependent | The relationship animates only when stronger source evidence proves source → target, target → source, or both. An import alone proves usage, not traffic direction. |
 
-ArchMesh stores a read relationship as `reader reads resource`. That evidence orientation is also the immutable orientation of the structural force-graph link. Flow animation must never swap that link's source and target merely to make a particle travel backwards.
-
-This separation is intentional. The earlier implementation reversed render endpoints for reads and later experimented with duplicate reverse links for bidirectional integrations. Both approaches coupled a visual effect to the d3 force topology. The graph layout now remains structural, while reverse and bidirectional evidence is preserved for a future visual-only pulse layer that does not participate in force simulation.
+ArchMesh stores a read relationship as `reader reads resource`. The architecture graph keeps that structural orientation unchanged while the visual flow layer renders the data movement as resource → reader.
 
 ### Integration direction
 
@@ -28,27 +26,39 @@ When ArchMesh has stronger provider-matched evidence, it can enrich the integrat
 
 When multiple lower-level relationships collapse into one feature, topology, or system edge, ArchMesh merges their directional evidence. Opposite proven directions become `both` rather than allowing whichever relationship was processed last to win.
 
-Reverse and bidirectional integration evidence remains part of the graph model and can be surfaced in labels and evidence views. The viewer does **not** create a second hidden force link for the reverse direction. A future reverse-pulse implementation must be visual-only so packet animation cannot alter layout stability.
+## Visual-only flow layer
+
+Flow packets are rendered in a separate Three.js overlay. They are **not links in the force graph** and therefore do not participate in d3 layout, camera fitting, system-boundary projection, or topology.
+
+That separation is deliberate. A previous implementation changed or duplicated force-link endpoints to make reverse packets travel correctly. Because those visual links participated in force layout, a rendering concern could destabilize the entire scene. The current implementation keeps structural source and target endpoints immutable.
+
+The overlay interpolates a packet between the already-rendered source and target node positions:
+
+- source → target evidence moves a packet forward along the existing connection;
+- target → source evidence moves a packet backward along the same connection;
+- bidirectional evidence creates two independently staggered visual streams, one in each direction;
+- unknown direction creates no packet animation rather than inventing traffic semantics.
 
 ## Visual treatment
 
 Flow is deliberately subordinate to architecture:
 
-- pulses are visible but lightweight;
-- static flow uses one-shot pulses emitted on independently staggered intervals rather than permanent synchronized particle loops;
+- packets are visible but lightweight;
+- one-shot pulses are emitted on independently staggered intervals rather than permanent synchronized loops;
 - the timing is intentionally illustrative and randomized; it does not encode request rate or throughput;
+- enabling Flow produces visible activity quickly instead of waiting several seconds for the first pulse;
 - selecting a new node or connection while Flow is enabled automatically enters **Focus** so unrelated flow stops receiving new pulses;
 - users can still explicitly switch back to **All** after making a selection;
-- Focus modestly emphasizes active connections and compact direction arrows;
-- All keeps normal architecture-line styling and uses the moving pulse itself to communicate flow, avoiding a graph-wide recolor;
-- All does not add directional arrows to every eligible relationship;
-- health state overrides semantic flow color when a relationship is warning, error, or impacted.
+- Focus modestly emphasizes active connections and packets;
+- All keeps normal architecture-line styling and uses moving packets to communicate direction;
+- health state overrides semantic flow color when a relationship is warning, error, or impacted;
+- active packet count is bounded so dense graphs cannot turn the visual layer into a rendering workload problem.
 
 ## Focus and All
 
-**Focus** emits intermittent pulses only for the selected connection or the safely animatable directional relationships touching the selected node. Each eligible relationship has its own timer, so a hub with many connections does not visually fire every relationship on the same frame.
+**Focus** emits intermittent packets only for the selected connection or the directional relationships touching the selected node. Each eligible direction has its own timer, so a hub with many connections does not visually fire every relationship on the same frame.
 
-**All** emits intermittent pulses across all safely animatable visible relationships with wider randomized spacing. It is useful for understanding overall directionality, but it remains a simulation of static evidence rather than a traffic monitor.
+**All** emits intermittent packets across all eligible visible relationships with wider randomized spacing. It is useful for understanding overall directionality, but it remains a simulation of static evidence rather than a traffic monitor.
 
 ## Evidence boundary
 
