@@ -2,6 +2,7 @@ import type { ArchGraphData } from './types.js';
 
 const DISPLAY_NAMES: Record<string, string> = {
   'javascript-typescript': 'JavaScript / TypeScript',
+  python: 'Python',
   nextjs: 'Next.js',
 };
 
