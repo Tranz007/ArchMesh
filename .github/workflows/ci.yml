@@ -83,7 +83,8 @@ jobs:
             exit 1
           fi
 
-          "$chrome" \
+          set +e
+          timeout 45s "$chrome" \
             --headless=new \
             --no-sandbox \
             --disable-dev-shm-usage \
@@ -94,11 +95,14 @@ jobs:
             --screenshot=/tmp/archmesh-viewer.png \
             http://127.0.0.1:4242/ \
             2> /tmp/chrome-viewer.log
+          chrome_status=$?
+          set -e
 
           echo "--- ArchMesh server ---"
           cat /tmp/archmesh-viewer.log
           echo "--- Chrome ---"
           cat /tmp/chrome-viewer.log
+          echo "Chrome status: $chrome_status"
           test -s /tmp/archmesh-viewer.png
 
       - name: Upload viewer diagnostics
