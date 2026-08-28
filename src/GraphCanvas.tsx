@@ -482,9 +482,9 @@ export function GraphCanvas({
     if (graphData.nodes.length === 0 || size.width < 120 || size.height < 120) return undefined;
     if (fittedGraphRef.current === graphIdentity) return undefined;
 
-    // The force engine can finish while the canvas is still at its initial 1×1
-    // measurement. Fit only after ResizeObserver has reported a real viewport;
-    // otherwise a failed early fit can leave the camera effectively miles away.
+    // Give the user a useful first frame once ResizeObserver reports a real
+    // viewport. The force engine may keep moving after this provisional fit;
+    // onEngineStop performs a second fit against the settled layout.
     const timer = window.setTimeout(() => {
       if (fittedGraphRef.current !== graphIdentity) fitGraph();
     }, 120);
@@ -672,7 +672,9 @@ export function GraphCanvas({
           onSelectEdge(undefined);
         }}
         onEngineStop={() => {
-          if (fittedGraphRef.current === graphIdentity) return;
+          // The provisional viewport fit happens while the simulation is still
+          // moving. Always refit once d3 settles so the final graph cannot land
+          // outside the camera frustum or leave the viewer zoomed into one hub.
           fitGraph();
         }}
       />
@@ -684,7 +686,7 @@ export function GraphCanvas({
             className={flowEnabled ? 'active' : ''}
             aria-pressed={flowEnabled}
             onClick={toggleFlow}
-            title="Animate illustrative directional calls, reads, writes, and integrations"
+            title="Animate safely supported directional calls and writes"
           >
             Flow {flowEnabled ? 'on' : 'off'}
           </button>
@@ -705,7 +707,7 @@ export function GraphCanvas({
                 className={flowScope === 'all' ? 'active secondary' : 'secondary'}
                 aria-pressed={flowScope === 'all'}
                 onClick={() => setFlowScope('all')}
-                title="Simulate intermittent pulses across every visible runtime and data flow"
+                title="Simulate intermittent pulses across every safely supported visible flow"
               >
                 All
               </button>
@@ -715,10 +717,10 @@ export function GraphCanvas({
         <span aria-hidden="true">
           {flowEnabled
             ? visualMode === 'security'
-              ? 'Illustrative pulses show detected direction; security colors remain evidence-based'
+              ? 'Illustrative pulses show supported direction; security colors remain evidence-based'
               : flowScope === 'focus'
                 ? 'Illustrative pulses are staggered around the selection · not runtime traffic volume'
-                : 'Illustrative pulses are staggered from static evidence · not runtime traffic volume'
+                : 'Illustrative pulses are staggered from static evidence · reverse flow remains evidence-only'
             : 'Drag to orbit · Scroll to zoom · Right-drag to pan'}
         </span>
       </div>
