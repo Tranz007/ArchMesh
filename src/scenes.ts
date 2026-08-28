@@ -1,4 +1,4 @@
-import type { ArchGraphData, ArchNode, NodeKind } from './types';
+import type { ArchEdge, ArchGraphData, ArchNode, NodeKind } from './types';
 
 export type SceneDirection = 'inbound' | 'both' | 'outbound';
 export type SceneSource = 'detected' | 'saved';
@@ -14,6 +14,8 @@ export interface ArchitectureScene {
   createdAt?: string;
   updatedAt?: string;
 }
+
+const SCENE_NODE_LIMIT = 72;
 
 const sceneKindWeight: Partial<Record<NodeKind, number>> = {
   integration: 120,
@@ -37,6 +39,68 @@ const sceneKindCap: Partial<Record<NodeKind, number>> = {
   component: 1,
 };
 
+const relationPriority: Record<ArchEdge['relation'], number> = {
+  calls: 100,
+  reads: 95,
+  writes: 95,
+  'integrates-with': 90,
+  'depends-on': 75,
+  imports: 60,
+  contains: 45,
+};
+
+function metadataText(node: ArchNode, ...keys: string[]) {
+  for (const key of keys) {
+    const value = node.metadata?.[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function pathContext(node: ArchNode) {
+  if (!node.path) return undefined;
+  const normalized = node.path.replace(/\\/g, '/');
+  const parts = normalized.split('/').filter(Boolean);
+  if (parts.length === 0) return undefined;
+  const file = parts.at(-1) ?? '';
+  const stemmed = file.replace(/\.(?:tsx?|jsx?|mjs|cjs|py)$/i, '');
+  if (['page', 'route', 'index'].includes(stemmed.toLowerCase())) parts.pop();
+  const context = parts.slice(-3).join('/');
+  return context || undefined;
+}
+
+function sceneName(node: ArchNode) {
+  const routePath = metadataText(node, 'routePath', 'pathPattern', 'endpointPath');
+  const methods = metadataText(node, 'httpMethods', 'method', 'methods');
+
+  if (node.kind === 'route') {
+    if (routePath) return `Route ${routePath}`;
+    const context = pathContext(node);
+    if (context) return `Route ${context}`;
+  }
+
+  if (node.kind === 'api') {
+    if (routePath) return `${methods ? `${methods} ` : 'API '}${routePath}`;
+    const context = pathContext(node);
+    if (context) return `API ${context}`;
+  }
+
+  if (node.kind === 'integration') return `${node.label} integration`;
+
+  if (node.kind === 'data') {
+    const resource = metadataText(node, 'collectionName', 'collection', 'resourceName', 'resource');
+    if (resource) return `${resource} data`;
+    return `${node.label} data`;
+  }
+
+  if (/^(?:page|route|index)\.(?:tsx?|jsx?|mjs|cjs)$/i.test(node.label)) {
+    const context = pathContext(node);
+    if (context) return `${node.kind} · ${context}`;
+  }
+
+  return node.label;
+}
+
 function degreeMap(data: ArchGraphData) {
   const degree = new Map<string, number>();
   for (const edge of data.edges) {
@@ -46,10 +110,51 @@ function degreeMap(data: ArchGraphData) {
   return degree;
 }
 
-function sceneName(node: ArchNode) {
-  if (node.kind === 'integration') return `${node.label} integration`;
-  if (node.kind === 'data') return `${node.label} data`;
-  return node.label;
+function orderedEdges(data: ArchGraphData) {
+  return [...data.edges].sort((left, right) => {
+    const priority = (relationPriority[right.relation] ?? 0) - (relationPriority[left.relation] ?? 0);
+    if (priority !== 0) return priority;
+    return left.id.localeCompare(right.id);
+  });
+}
+
+function walkDirection(
+  data: ArchGraphData,
+  rootId: string,
+  direction: Exclude<SceneDirection, 'both'>,
+  depth: number,
+  limit: number,
+) {
+  const visited = new Set<string>([rootId]);
+  let frontier = new Set<string>([rootId]);
+  let truncated = false;
+  const edges = orderedEdges(data);
+
+  for (let hop = 0; hop < depth && frontier.size > 0; hop += 1) {
+    const next = new Set<string>();
+
+    for (const edge of edges) {
+      const matches = direction === 'outbound'
+        ? frontier.has(edge.source)
+        : frontier.has(edge.target);
+      if (!matches) continue;
+
+      const candidate = direction === 'outbound' ? edge.target : edge.source;
+      if (visited.has(candidate)) continue;
+
+      if (visited.size >= limit) {
+        truncated = true;
+        continue;
+      }
+
+      visited.add(candidate);
+      next.add(candidate);
+    }
+
+    frontier = next;
+  }
+
+  return { visited, truncated };
 }
 
 export function sceneFromNode(
@@ -81,7 +186,7 @@ export function deriveSceneCandidates(data: ArchGraphData, limit = 10): Architec
         + (node.health === 'error' ? 50 : node.health === 'warning' || node.health === 'impacted' ? 25 : 0)
         + (node.change === 'changed' ? 24 : node.change === 'affected' ? 12 : 0),
     }))
-    .sort((left, right) => right.score - left.score || left.node.label.localeCompare(right.node.label));
+    .sort((left, right) => right.score - left.score || sceneName(left.node).localeCompare(sceneName(right.node)));
 
   const selected: ArchNode[] = [];
   const selectedByKind = new Map<NodeKind, number>();
@@ -117,27 +222,29 @@ export function projectScene(data: ArchGraphData, scene: ArchitectureScene): Arc
     };
   }
 
+  // "Both" means two independent investigations from the seed: what this
+  // entity reaches and what reaches it. Do not reverse direction at each hop.
+  // Reversing mid-walk turns a shared dependency or parent container into a
+  // bridge to every sibling, which is how a focused route can explode back
+  // into the whole repository.
+  const traversals = scene.direction === 'both'
+    ? [
+        walkDirection(data, scene.seedId, 'outbound', scene.depth, SCENE_NODE_LIMIT),
+        walkDirection(data, scene.seedId, 'inbound', scene.depth, SCENE_NODE_LIMIT),
+      ]
+    : [walkDirection(data, scene.seedId, scene.direction, scene.depth, SCENE_NODE_LIMIT)];
+
   const visited = new Set<string>([scene.seedId]);
-  let frontier = new Set<string>([scene.seedId]);
-
-  for (let depth = 0; depth < scene.depth; depth += 1) {
-    const next = new Set<string>();
-
-    for (const edge of data.edges) {
-      const outbound = frontier.has(edge.source);
-      const inbound = frontier.has(edge.target);
-
-      if ((scene.direction === 'outbound' || scene.direction === 'both') && outbound) {
-        if (!visited.has(edge.target)) next.add(edge.target);
+  let truncated = false;
+  for (const traversal of traversals) {
+    for (const id of traversal.visited) {
+      if (visited.size >= SCENE_NODE_LIMIT && !visited.has(id)) {
+        truncated = true;
+        continue;
       }
-      if ((scene.direction === 'inbound' || scene.direction === 'both') && inbound) {
-        if (!visited.has(edge.source)) next.add(edge.source);
-      }
+      visited.add(id);
     }
-
-    if (next.size === 0) break;
-    for (const id of next) visited.add(id);
-    frontier = next;
+    truncated = truncated || traversal.truncated;
   }
 
   const nodes = data.nodes.filter((node) => visited.has(node.id));
@@ -153,8 +260,13 @@ export function projectScene(data: ArchGraphData, scene: ArchitectureScene): Arc
       sceneId: scene.id,
       sceneName: scene.name,
       sceneSeedId: scene.seedId,
+      sceneSeedKind: scene.seedKind,
       sceneDirection: scene.direction,
       sceneDepth: scene.depth,
+      sceneNodeCount: nodes.length,
+      sceneEdgeCount: edges.length,
+      sceneTruncated: truncated,
+      sceneNodeLimit: SCENE_NODE_LIMIT,
       hiddenNodes: Math.max(0, data.nodes.length - nodes.length),
       hiddenEdges: Math.max(0, data.edges.length - edges.length),
     },
