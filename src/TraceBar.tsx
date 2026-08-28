@@ -9,18 +9,22 @@ import type { TraceDirection } from './projections/trace';
 interface TraceBarProps {
   rootLabel: string;
   direction: TraceDirection;
+  depth: number;
   nodeCount: number;
   edgeCount: number;
   onDirectionChange: (direction: TraceDirection) => void;
+  onDepthChange: (depth: number) => void;
   onExit: () => void;
 }
 
 export function TraceBar({
   rootLabel,
   direction,
+  depth,
   nodeCount,
   edgeCount,
   onDirectionChange,
+  onDepthChange,
   onExit,
 }: TraceBarProps) {
   return (
@@ -29,7 +33,7 @@ export function TraceBar({
         <span className="trace-icon"><GitFork size={14} /></span>
         <span>
           Tracing <strong>{rootLabel}</strong>
-          <small>{nodeCount} nodes · {edgeCount} connections</small>
+          <small>{nodeCount} nodes · {edgeCount} connections · {depth} {depth === 1 ? 'hop' : 'hops'}</small>
         </span>
       </div>
 
@@ -62,6 +66,13 @@ export function TraceBar({
           Outbound <ArrowRightFromLine size={13} />
         </button>
       </div>
+
+      <label className="trace-depth">
+        <span>Depth</span>
+        <select value={depth} onChange={(event) => onDepthChange(Number(event.target.value))}>
+          {[1, 2, 3, 4].map((value) => <option key={value} value={value}>{value}</option>)}
+        </select>
+      </label>
 
       <button type="button" className="trace-exit" onClick={onExit}>
         <X size={13} /> Back to lens
