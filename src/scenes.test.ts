@@ -8,7 +8,7 @@ const graph: ArchGraphData = {
   nodes: [
     { id: 'product', label: 'Example', kind: 'product', health: 'healthy' },
     { id: 'feature:account', label: 'Account', kind: 'feature', health: 'healthy' },
-    { id: 'route:profile', label: 'Profile', kind: 'route', health: 'healthy' },
+    { id: 'route:profile', label: 'page.tsx', kind: 'route', health: 'healthy', path: 'src/app/profile/page.tsx', metadata: { routePath: '/profile' } },
     { id: 'service:session', label: 'Session', kind: 'service', health: 'healthy' },
     { id: 'integration:identity', label: 'Identity', kind: 'integration', health: 'healthy' },
     { id: 'file:other', label: 'Other', kind: 'file', health: 'healthy' },
@@ -51,6 +51,11 @@ describe('architecture scenes', () => {
     expect(new Set(scenes.map((scene) => scene.seedKind)).size).toBeGreaterThan(1);
   });
 
+  it('uses route semantics instead of generic page filenames for scene names', () => {
+    const route = graph.nodes.find((node) => node.id === 'route:profile')!;
+    expect(sceneFromNode(route).name).toBe('Route /profile');
+  });
+
   it('projects a bounded neighborhood around a seed', () => {
     const seed = graph.nodes.find((node) => node.id === 'route:profile')!;
     const scene = sceneFromNode(seed, { depth: 1, direction: 'both' });
@@ -62,6 +67,36 @@ describe('architecture scenes', () => {
       'service:session',
     ]);
     expect(projected.edges.map((edge) => edge.id).sort()).toEqual(['e2', 'e3']);
+  });
+
+  it('does not fan back out through a parent container or shared dependency in both mode', () => {
+    const fanoutGraph: ArchGraphData = {
+      project: 'Fanout',
+      generatedAt: '2026-08-28T00:00:00.000Z',
+      nodes: [
+        { id: 'feature', label: 'Account', kind: 'feature', health: 'healthy' },
+        { id: 'route', label: 'page.tsx', kind: 'route', health: 'healthy', metadata: { routePath: '/account' } },
+        { id: 'sibling', label: 'settings.tsx', kind: 'component', health: 'healthy' },
+        { id: 'shared', label: 'session.ts', kind: 'service', health: 'healthy' },
+        { id: 'api', label: 'account.ts', kind: 'api', health: 'healthy' },
+      ],
+      edges: [
+        { id: 'contains-route', source: 'feature', target: 'route', relation: 'contains', health: 'healthy' },
+        { id: 'contains-sibling', source: 'feature', target: 'sibling', relation: 'contains', health: 'healthy' },
+        { id: 'route-shared', source: 'route', target: 'shared', relation: 'imports', health: 'healthy' },
+        { id: 'sibling-shared', source: 'sibling', target: 'shared', relation: 'imports', health: 'healthy' },
+        { id: 'shared-api', source: 'shared', target: 'api', relation: 'calls', health: 'healthy' },
+      ],
+    };
+
+    const scene = sceneFromNode(fanoutGraph.nodes.find((node) => node.id === 'route')!, {
+      depth: 2,
+      direction: 'both',
+    });
+    const projected = projectScene(fanoutGraph, scene);
+
+    expect(projected.nodes.map((node) => node.id).sort()).toEqual(['api', 'feature', 'route', 'shared']);
+    expect(projected.nodes.some((node) => node.id === 'sibling')).toBe(false);
   });
 
   it('marks a saved scene whose seed no longer exists', () => {
