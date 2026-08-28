@@ -110,4 +110,23 @@ describe('system boundary detection', () => {
     expect(result.nodes.map((node) => node.metadata?.systemKey)).toEqual(['frontend', 'backend']);
     expect(result.metadata?.systemBoundaryCount).toBe(2);
   });
+
+  it('does not treat a framework source app directory as a systems container', async () => {
+    const root = await tempProject();
+    await fs.mkdir(path.join(root, 'app', 'admin'), { recursive: true });
+    await fs.writeFile(path.join(root, 'package.json'), JSON.stringify({ dependencies: { next: '15.5.0' } }));
+
+    const input = graph([
+      'app/layout.tsx',
+      'app/page.tsx',
+      'app/sitemap.ts',
+      'app/admin/page.tsx',
+    ]);
+    const boundaries = await detectSystemBoundaries(root, input);
+    const result = await applySystemBoundaries(root, input);
+
+    expect(boundaries).toEqual([]);
+    expect(result.metadata?.systemBoundaryCount).toBeUndefined();
+    expect(result.nodes.every((node) => node.metadata?.systemKey === undefined)).toBe(true);
+  });
 });
