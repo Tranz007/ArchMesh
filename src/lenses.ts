@@ -1,4 +1,4 @@
-import type { ArchGraphData, ArchNode, HealthState } from './types';
+import type { ArchEdge, ArchGraphData, ArchNode, HealthState } from './types';
 
 export type ArchitectureLens =
   | 'system'
@@ -10,6 +10,9 @@ export type ArchitectureLens =
   | 'health'
   | 'drift'
   | 'code';
+
+const MAX_SYSTEM_DEPENDENCY_EDGES = 36;
+const MAX_SYSTEM_CONNECTIONS_PER_INTEGRATION = 8;
 
 const healthWeight: Record<HealthState, number> = {
   healthy: 0,
@@ -65,6 +68,89 @@ function withNodes(data: ArchGraphData, nodeIds: Set<string>, graphKind: string)
   };
 }
 
+function edgeIsPriority(edge: ArchEdge) {
+  return edge.health !== 'healthy' || edge.change === 'changed' || edge.change === 'affected';
+}
+
+function edgeImportance(
+  edge: ArchEdge,
+  nodeById: Map<string, ArchNode>,
+  degree: Map<string, number>,
+) {
+  let score = 0;
+  for (const id of [edge.source, edge.target]) {
+    const node = nodeById.get(id);
+    if (!node) continue;
+    if (node.kind === 'feature') score += featureImportance(node, degree);
+    else score += (degree.get(node.id) ?? 0) * 8 + healthWeight[node.health];
+  }
+  if (edge.change === 'changed') score += 180;
+  if (edge.change === 'affected') score += 90;
+  score += healthWeight[edge.health] * 2;
+  return score;
+}
+
+function isIntegrationLike(node?: ArchNode) {
+  return Boolean(node && (node.kind === 'integration' || (node.kind === 'data' && !node.path)));
+}
+
+function trimSystemOverviewEdges(data: ArchGraphData, degree: Map<string, number>) {
+  const nodeById = new Map(data.nodes.map((node) => [node.id, node]));
+  const keep = new Set<string>();
+  const dependencyEdges: ArchEdge[] = [];
+  const integrationEdges = new Map<string, ArchEdge[]>();
+
+  for (const edge of data.edges) {
+    if (edge.relation === 'contains' || edgeIsPriority(edge)) {
+      keep.add(edge.id);
+      continue;
+    }
+
+    if (edge.relation === 'depends-on') {
+      dependencyEdges.push(edge);
+      continue;
+    }
+
+    if (edge.relation === 'integrates-with') {
+      const source = nodeById.get(edge.source);
+      const target = nodeById.get(edge.target);
+      const integration = isIntegrationLike(source)
+        ? source
+        : isIntegrationLike(target)
+          ? target
+          : undefined;
+      if (!integration) {
+        keep.add(edge.id);
+        continue;
+      }
+      const bucket = integrationEdges.get(integration.id) ?? [];
+      bucket.push(edge);
+      integrationEdges.set(integration.id, bucket);
+      continue;
+    }
+
+    keep.add(edge.id);
+  }
+
+  dependencyEdges
+    .sort((left, right) => edgeImportance(right, nodeById, degree) - edgeImportance(left, nodeById, degree))
+    .slice(0, MAX_SYSTEM_DEPENDENCY_EDGES)
+    .forEach((edge) => keep.add(edge.id));
+
+  for (const edges of integrationEdges.values()) {
+    edges
+      .sort((left, right) => edgeImportance(right, nodeById, degree) - edgeImportance(left, nodeById, degree))
+      .slice(0, MAX_SYSTEM_CONNECTIONS_PER_INTEGRATION)
+      .forEach((edge) => keep.add(edge.id));
+  }
+
+  const edges = data.edges.filter((edge) => keep.has(edge.id));
+  return {
+    edges,
+    hiddenEdges: Math.max(0, data.edges.length - edges.length),
+  };
+}
+
 export function projectSystemOverview(data: ArchGraphData, maxFeatures = 26, maxIntegrations = 12): ArchGraphData {
   const degree = nodeDegree(data);
   const products = data.nodes.filter((node) => node.kind === 'product');
@@ -102,7 +188,16 @@ export function projectSystemOverview(data: ArchGraphData, maxFeatures = 26, max
     if (integration.health !== 'healthy') nodeIds.add(integration.id);
   }
 
-  return withNodes(data, nodeIds, 'system-overview');
+  const projected = withNodes(data, nodeIds, 'system-overview');
+  const trimmed = trimSystemOverviewEdges(projected, degree);
+  return {
+    ...projected,
+    edges: trimmed.edges,
+    metadata: {
+      ...projected.metadata,
+      hiddenEdges: trimmed.hiddenEdges,
+    },
+  };
 }
 
 export function projectProductAreas(data: ArchGraphData): ArchGraphData {

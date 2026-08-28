@@ -44,6 +44,62 @@ describe('architecture lenses', () => {
     expect(result.nodes.some((item) => item.id === 'feature:b')).toBe(false);
   });
 
+  it('budgets dense healthy System Map relationships while preserving priority evidence', () => {
+    const featureNodes = Array.from({ length: 26 }, (_, index) =>
+      node(`feature:${index}`, 'feature', { metadata: { memberCount: 30 - index } }));
+    const denseEdges: ArchGraphData['edges'] = featureNodes.map((feature, index) => ({
+      id: `contains:${index}`,
+      source: 'product',
+      target: feature.id,
+      relation: 'contains',
+      health: 'healthy',
+    }));
+
+    for (let index = 0; index < 26; index += 1) {
+      for (let offset = 1; offset <= 3; offset += 1) {
+        denseEdges.push({
+          id: `dependency:${index}:${offset}`,
+          source: `feature:${index}`,
+          target: `feature:${(index + offset) % 26}`,
+          relation: 'depends-on',
+          health: 'healthy',
+        });
+      }
+    }
+
+    for (let index = 0; index < 20; index += 1) {
+      denseEdges.push({
+        id: `integration:${index}`,
+        source: `feature:${index}`,
+        target: 'provider',
+        relation: 'integrates-with',
+        health: 'healthy',
+      });
+    }
+
+    denseEdges.push({
+      id: 'priority-dependency',
+      source: 'feature:24',
+      target: 'feature:25',
+      relation: 'depends-on',
+      health: 'warning',
+    });
+
+    const denseGraph: ArchGraphData = {
+      project: 'Dense Example',
+      generatedAt: new Date(0).toISOString(),
+      nodes: [node('product', 'product'), ...featureNodes, node('provider', 'integration')],
+      edges: denseEdges,
+    };
+
+    const result = projectSystemOverview(denseGraph);
+    expect(result.edges.filter((edge) => edge.relation === 'contains')).toHaveLength(26);
+    expect(result.edges.filter((edge) => edge.relation === 'depends-on').length).toBeLessThanOrEqual(37);
+    expect(result.edges.filter((edge) => edge.relation === 'integrates-with').length).toBeLessThanOrEqual(8);
+    expect(result.edges.some((edge) => edge.id === 'priority-dependency')).toBe(true);
+    expect(Number(result.metadata?.hiddenEdges ?? 0)).toBeGreaterThan(0);
+  });
+
   it('shows only product and feature nodes in product areas', () => {
     const result = projectProductAreas(graph);
     expect(new Set(result.nodes.map((item) => item.kind))).toEqual(new Set(['product', 'feature']));
