@@ -471,9 +471,26 @@ export function GraphCanvas({
   );
 
   const fitGraph = () => {
+    const graph = graphRef.current;
+    if (!graph || graphData.nodes.length === 0 || size.width < 120 || size.height < 120) return false;
+    graph.zoomToFit(450, 72);
     fittedGraphRef.current = graphIdentity;
-    graphRef.current?.zoomToFit(450, 72);
+    return true;
   };
+
+  useEffect(() => {
+    if (graphData.nodes.length === 0 || size.width < 120 || size.height < 120) return undefined;
+    if (fittedGraphRef.current === graphIdentity) return undefined;
+
+    // The force engine can finish while the canvas is still at its initial 1×1
+    // measurement. Fit only after ResizeObserver has reported a real viewport;
+    // otherwise a failed early fit can leave the camera effectively miles away.
+    const timer = window.setTimeout(() => {
+      if (fittedGraphRef.current !== graphIdentity) fitGraph();
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [graphData.nodes.length, graphIdentity, size.height, size.width]);
 
   const toggleFlow = () => {
     setFlowEnabled((enabled) => {
