@@ -7,6 +7,11 @@ import type {
   HealthState,
 } from '../types';
 
+const MAX_VISIBLE_SYSTEMS = 26;
+const MAX_VISIBLE_EXTERNALS = 12;
+const MAX_CROSS_SYSTEM_EDGES = 36;
+const MAX_EDGES_PER_EXTERNAL = 8;
+
 const healthRank: Record<HealthState, number> = {
   healthy: 0,
   unknown: 1,
@@ -109,6 +114,119 @@ function addAggregatedEdge(
   };
   edges.push(edge);
   dedupe.set(key, edge);
+}
+
+function nodePriority(node: ArchNode, degree: Map<string, number>) {
+  const memberCount = typeof node.metadata?.memberCount === 'number' ? node.metadata.memberCount : 0;
+  const health = healthRank[node.health] * 240;
+  const change = node.change === 'changed' ? 180 : node.change === 'affected' ? 90 : 0;
+  return memberCount * 4 + (degree.get(node.id) ?? 0) * 8 + health + change;
+}
+
+function edgePriority(edge: ArchEdge, nodeById: Map<string, ArchNode>, degree: Map<string, number>) {
+  const source = nodeById.get(edge.source);
+  const target = nodeById.get(edge.target);
+  const health = healthRank[edge.health] * 300;
+  const change = edge.change === 'changed' ? 180 : edge.change === 'affected' ? 90 : 0;
+  return health + change + (source ? nodePriority(source, degree) : 0) + (target ? nodePriority(target, degree) : 0);
+}
+
+function isPriorityNode(node: ArchNode) {
+  return node.health !== 'healthy' || node.change === 'changed' || node.change === 'affected';
+}
+
+function isPriorityEdge(edge: ArchEdge) {
+  return edge.health !== 'healthy' || edge.change === 'changed' || edge.change === 'affected';
+}
+
+function stabilizeSystemBoundaryGraph(data: ArchGraphData, rootId: string): ArchGraphData {
+  const degree = new Map<string, number>();
+  for (const edge of data.edges) {
+    degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
+    degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
+  }
+
+  const systems = data.nodes.filter((node) => node.kind === 'system');
+  const externals = data.nodes.filter((node) => isExternalResource(node));
+
+  const selectedSystemIds = new Set(
+    systems.filter(isPriorityNode).map((node) => node.id),
+  );
+  systems
+    .filter((node) => !selectedSystemIds.has(node.id))
+    .sort((left, right) => nodePriority(right, degree) - nodePriority(left, degree))
+    .slice(0, MAX_VISIBLE_SYSTEMS)
+    .forEach((node) => selectedSystemIds.add(node.id));
+
+  const selectedExternalIds = new Set(
+    externals.filter(isPriorityNode).map((node) => node.id),
+  );
+  externals
+    .filter((node) => !selectedExternalIds.has(node.id))
+    .sort((left, right) => nodePriority(right, degree) - nodePriority(left, degree))
+    .slice(0, MAX_VISIBLE_EXTERNALS)
+    .forEach((node) => selectedExternalIds.add(node.id));
+
+  const selectedNodeIds = new Set<string>([rootId, ...selectedSystemIds, ...selectedExternalIds]);
+  const nodes = data.nodes.filter((node) => selectedNodeIds.has(node.id));
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const candidateEdges = data.edges.filter(
+    (edge) => selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target),
+  );
+
+  const keep = new Set<string>();
+  const externalBuckets = new Map<string, ArchEdge[]>();
+  const crossSystemEdges: ArchEdge[] = [];
+
+  for (const edge of candidateEdges) {
+    if (edge.relation === 'contains' || isPriorityEdge(edge)) {
+      keep.add(edge.id);
+      continue;
+    }
+
+    const source = nodeById.get(edge.source);
+    const target = nodeById.get(edge.target);
+    const external = isExternalResource(source)
+      ? source
+      : isExternalResource(target)
+        ? target
+        : undefined;
+
+    if (external) {
+      const bucket = externalBuckets.get(external.id) ?? [];
+      bucket.push(edge);
+      externalBuckets.set(external.id, bucket);
+      continue;
+    }
+
+    crossSystemEdges.push(edge);
+  }
+
+  crossSystemEdges
+    .sort((left, right) => edgePriority(right, nodeById, degree) - edgePriority(left, nodeById, degree))
+    .slice(0, MAX_CROSS_SYSTEM_EDGES)
+    .forEach((edge) => keep.add(edge.id));
+
+  for (const edges of externalBuckets.values()) {
+    edges
+      .sort((left, right) => edgePriority(right, nodeById, degree) - edgePriority(left, nodeById, degree))
+      .slice(0, MAX_EDGES_PER_EXTERNAL)
+      .forEach((edge) => keep.add(edge.id));
+  }
+
+  const edges = candidateEdges.filter((edge) => keep.has(edge.id));
+
+  return {
+    ...data,
+    nodes,
+    edges,
+    metadata: {
+      ...(data.metadata ?? {}),
+      hiddenNodes: Math.max(0, data.nodes.length - nodes.length),
+      hiddenEdges: Math.max(0, data.edges.length - edges.length),
+      systemMapBudgeted: true,
+    },
+  };
 }
 
 export function projectSystemBoundaries(data: ArchGraphData): ArchGraphData | undefined {
@@ -256,7 +374,7 @@ export function projectSystemBoundaries(data: ArchGraphData): ArchGraphData | un
 
   nodes.push(...data.nodes.filter((node) => externalIds.has(node.id)));
 
-  return {
+  return stabilizeSystemBoundaryGraph({
     ...data,
     nodes,
     edges,
@@ -266,5 +384,5 @@ export function projectSystemBoundaries(data: ArchGraphData): ArchGraphData | un
       systemBoundaryCount: systems.size,
       hiddenNodes: Math.max(0, data.nodes.length - externalIds.size),
     },
-  };
+  }, rootId);
 }
