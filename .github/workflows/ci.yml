@@ -96,6 +96,46 @@ jobs:
 
           test -s /tmp/archmesh-viewer.png
 
+      - name: Render 39-node fallback System Map
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/system-overview-fixture.mjs
+          npm run dev -- --host 0.0.0.0 --port 4242 --strictPort > /tmp/archmesh-system-overview.log 2>&1 &
+          server_pid=$!
+          cleanup() { kill "$server_pid" 2>/dev/null || true; }
+          trap cleanup EXIT
+
+          ready=0
+          for i in {1..60}; do
+            if curl -fsS http://localhost:4242/ >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 0.5
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat /tmp/archmesh-system-overview.log
+            exit 1
+          fi
+
+          chrome="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$chrome"
+
+          timeout 45s "$chrome" \
+            --headless=new \
+            --no-sandbox \
+            --disable-dev-shm-usage \
+            --enable-webgl \
+            --use-angle=swiftshader \
+            --window-size=1425,990 \
+            --virtual-time-budget=10000 \
+            --screenshot=/tmp/archmesh-system-overview.png \
+            http://localhost:4242/ \
+            2> /tmp/chrome-system-overview.log
+
+          test -s /tmp/archmesh-system-overview.png
+
       - name: Upload viewer diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -105,4 +145,7 @@ jobs:
             /tmp/archmesh-viewer.png
             /tmp/archmesh-viewer.log
             /tmp/chrome-viewer.log
+            /tmp/archmesh-system-overview.png
+            /tmp/archmesh-system-overview.log
+            /tmp/chrome-system-overview.log
           if-no-files-found: warn
