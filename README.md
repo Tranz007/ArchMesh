@@ -2,21 +2,23 @@
 
 **A local-first visual architecture explorer for modern software projects.**
 
-ArchMesh scans a codebase on your machine and turns it into an interactive map of how the system is actually put together: product areas, routes, services, APIs, data stores, integrations, source files, dependencies, failures, source changes, architecture drift, directional data flow, and security evidence.
+ArchMesh scans a codebase on your machine and turns it into an interactive map of how the system is actually put together: apps and services, product areas, routes, APIs, data stores, integrations, source files, dependencies, failures, source changes, architecture drift, directional data flow, and security evidence.
 
 > **See how your system connects. See when it doesn't.**
 
-ArchMesh is built for developers, architects, designers, and AI coding agents who need to understand a real codebase without repeatedly reconstructing the architecture from folders, search results, and logs.
+ArchMesh is built for developers, architects, designers, and people building software with AI who need to understand a real codebase without repeatedly reconstructing the architecture from folders, search results, and logs.
+
+A useful way to think about it is: **“I built this with AI. Now show me what I actually built.”** ArchMesh is intended to make the underlying software legible without requiring the person looking at it to think in imports and directory trees first.
 
 ## Why ArchMesh
 
-Large applications are difficult to hold in your head. A shared service can affect several features. A data collection can be read in one area and written in another. A runtime error can begin in one file and affect a distant user workflow. Sensitive data can cross a system boundary without that fact being obvious from a directory tree. During active development, architecture itself can change without anyone noticing a new dependency or removed route.
+Large applications are difficult to hold in your head. A shared service can affect several features. A frontend can call a backend written in a different language. A data collection can be read in one area and written in another. A runtime error can begin in one file and affect a distant user workflow. Sensitive data can cross a system boundary without that fact being obvious from a directory tree. During active development, architecture itself can change without anyone noticing a new dependency or removed route.
 
 ArchMesh makes those relationships visible while keeping the exact scanned code graph as the evidence layer underneath higher-level views.
 
 ### Views and lenses
 
-- **Architecture** — How is the product organized?
+- **Architecture** — How is the product organized into systems and product areas?
 - **Topology** — Which features touch which data stores and external systems?
 - **Security** — Where does security-relevant data move, what boundaries does it cross, and what protections can source evidence actually prove?
 - **Changes** — What source changed, and what else depends on it?
@@ -28,62 +30,69 @@ The core experience runs locally. Your source code does not need to be uploaded 
 
 ## What can ArchMesh scan?
 
-ArchMesh uses layered support. A codebase does **not** need a dedicated framework adapter before it can produce a useful graph: the current scanner structurally understands `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, and `.cjs` across many JavaScript/TypeScript repositories. Dedicated adapters add deeper framework-specific architecture on top of that source graph.
+ArchMesh uses layered support. A codebase does **not** need a dedicated framework adapter before it can produce a useful graph. Language plugins provide structural evidence; framework adapters add deeper architecture on top; workspace/system detection can then collapse a multi-app repository into human-scale system blocks.
 
 | Codebase / framework | Support today | Current coverage |
 | --- | --- | --- |
-| **Next.js App Router** | **Deep** | Source graph + pages, API routes, route paths, HTTP methods, server-action evidence, internal API calls |
-| **React + Vite / CRA** | **Structural** | Source/import graph, components/services, static fetches, integrations |
-| **Node.js** | **Structural** | Modules, imports, services/repositories/adapters, static fetches, integrations |
+| **Next.js App Router** | **Deep** | JS/TS graph + pages, API routes, route paths, HTTP methods, server-action evidence, internal API calls |
+| **Angular** | **Deep** | TypeScript graph + components, injectables, static templates, constructor/`inject()` DI, static routes, redirects, eager/lazy component targets |
+| **FastAPI** | **Deep** | Python graph + route decorators, static methods/paths, router prefixes, semantic handler nodes, selected `Depends(...)` evidence |
+| **React + Vite / CRA** | **Structural** | JS/TS source/import graph, components/services, static `fetch()`, integrations |
+| **Node.js** | **Structural** | JS/TS modules, imports, services/repositories/adapters, static `fetch()`, integrations |
+| **Python services / libraries** | **Structural** | `.py` source, absolute/relative package imports, root and `src/` layouts, generic service/data structure, selected integrations |
 | **Express / Fastify / Hono** | **Structural** | Underlying JS/TS graph; framework route/middleware semantics are not first-class yet |
 | **NestJS** | **Structural** | TypeScript graph; controllers/modules/providers/DI semantics are not first-class yet |
-| **Angular** | **Structural** | TypeScript graph and generic component/service structure; Router, DI, templates, and `HttpClient` semantics need an adapter |
+| **Django / Flask** | **Structural** | Underlying Python source/import graph; framework routes/views/ORM semantics need adapters |
 | **React Native / Expo** | **Structural** | JS/TS graph, components/services, static fetches; navigation/native boundaries need an adapter |
 | **Electron** | **Structural** | JS/TS graph across main/renderer source; IPC/process boundaries are not modeled yet |
-| **npm / pnpm / Yarn monorepos, Nx, Turborepo** | **Partial** | Source inside the selected root can scan; workspace/package boundaries need deeper semantics |
+| **npm / Yarn workspaces + common app/service/package layouts** | **Structural** | Detects workspace/convention boundaries and visualizes apps, services, packages, and cross-boundary relationships in the System Map |
+| **pnpm / Nx / Turborepo** | **Partial** | Supported source and common directory boundaries can be visualized | 
 | **Vue / Nuxt** | **Partial** | Standalone JS/TS scans; `.vue` SFCs and Nuxt semantics are not parsed yet |
 | **Svelte / SvelteKit** | **Partial** | Standalone JS/TS scans; `.svelte` files and SvelteKit semantics are not parsed yet |
 | **Astro** | **Partial** | Standalone JS/TS scans; `.astro` files and Astro semantics are not parsed yet |
-| **Python / Django / FastAPI / Flask** | **Planned** | Python parser + framework adapters required |
 | **Java / Kotlin / Spring** | **Planned** | JVM parser/project graph + Spring semantics required |
 | **C# / .NET / ASP.NET Core** | **Planned** | C# project graph + .NET framework semantics required |
 | **Go / Rust / Ruby / PHP** | **Planned** | Language parsers and framework adapters required |
 
-**Deep** means ArchMesh understands important framework-specific architecture. **Structural** means the source/dependency graph is useful today but framework-specific semantics are incomplete. **Partial** means only supported JS/TS portions of the repository are currently parsed. **Planned** means the primary source language is not scanned yet.
+**Deep** means ArchMesh understands important framework-specific architecture. **Structural** means the source/dependency graph is useful today but framework-specific semantics may still be incomplete. **Partial** means useful evidence is available but important native files/configuration are not parsed. **Planned** means the primary source language is not scanned yet.
 
-Scanner breadth is built around a versioned **language-plugin + framework-adapter** host. A language plugin contributes structural graph evidence; compatible framework adapters enrich that shared graph with routes, DI, handlers, or other framework semantics. Mixed-language repositories can eventually activate multiple parsers into one ArchMesh graph instead of requiring separate viewers.
+Scanner breadth is built around a versioned **language-plugin + framework-adapter + shared graph** model. Mixed JavaScript/TypeScript and Python repositories already activate multiple parsers into one ArchMesh graph instead of requiring separate viewers.
 
 See the full [Codebase Support Matrix](docs/SUPPORT_MATRIX.md) for exact file support and gaps, and [Plugin Development](docs/PLUGIN_DEVELOPMENT.md) for the parser/adapter contract.
 
 ## Current capabilities
 
-ArchMesh is pre-1.0, but already supports a useful TypeScript/JavaScript baseline:
+ArchMesh is pre-1.0, but already includes:
 
 - versioned scanner plugin host with graph-fragment merging and framework-adapter extension points;
 - built-in JavaScript/TypeScript language plugin covering `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, and `.cjs`;
+- built-in Python language plugin covering `.py`, local package imports, common `src/` layouts, and mixed-language graph merging;
+- deep first-party adapters for Next.js App Router, Angular, and FastAPI;
+- detected app/service/package boundaries from npm-style workspaces and common architecture layouts;
+- a System Map that can collapse implementation detail into first-class system blocks while preserving cross-system relationships and external integrations;
 - interactive Three.js/WebGL 3D architecture graph with orbit, zoom, pan, and fit-to-view controls;
-- semantic node shapes and colors for products, features, services/APIs, routes, data, integrations, components, files, and modules;
+- semantic node shapes and colors for products, systems, features, services/APIs, routes, data, integrations, components, files, and modules;
 - Architecture Lenses for System Map, Product Areas, Data & Integrations, Routes & APIs, Security, Change Impact, Health, Architecture Drift, and Code Structure;
-- progressive disclosure so the default architecture view prioritizes meaningful product structure instead of opening as a file-level hairball;
+- progressive disclosure so the default architecture view prioritizes meaningful structure instead of opening as a file-level hairball;
 - directional **Trace from here** investigation with Inbound / Both / Outbound controls and progressive re-rooting;
 - optional directional Flow mode with small animated pulses for calls, reads, writes, and integration relationships;
 - bidirectional-looking flow when independent evidence exists in both directions between the same nodes;
-- security evidence for static sensitive payload fields, external boundaries, cleartext HTTP, TLS-requested HTTPS, and unknown protection states;
+- security evidence for static sensitive payload fields, external boundaries, cleartext HTTP, TLS-requested HTTPS, and unknown protections;
 - security-specific connection colors without replacing semantic node identity;
 - search, node inspection, selectable connections, and directional dependency inspection;
-- Architecture, Topology, Changes, Drift, and Code views;
 - feature drill-down without expanding unrelated implementation detail;
-- TypeScript/JavaScript imports, exports, and nested dynamic imports;
-- relative imports and TypeScript `baseUrl` / `paths` aliases;
-- Next.js App Router pages, API routes, route paths, HTTP methods, metadata files, and server-action evidence;
-- internal `fetch('/api/...')` call mapping and external HTTP host discovery;
+- TypeScript/JavaScript imports, exports, nested dynamic imports, relative resolution, and TypeScript `baseUrl` / `paths` aliases;
+- Python absolute/relative package import resolution and selected external integration detection;
+- Next.js pages/API routes/server actions, Angular component/DI/router semantics, and FastAPI request handlers;
+- internal Next.js `fetch('/api/...')` call mapping and external HTTP host discovery;
 - Firebase/Firestore collection read/write/listener relationships;
-- first-class integration nodes for Firebase, Stripe, OpenAI, WorkOS, Resend, and Vercel;
+- first-class integration nodes for Firebase, Stripe, OpenAI, WorkOS, Resend, Vercel, and selected Python integrations;
 - optional project-defined product/feature semantics through `archmesh.config.json`;
 - TypeScript diagnostics and generic health-signal ingestion;
 - Git working-tree and base-ref change impact;
 - live watch mode with browser refresh without a full page reload;
 - architecture drift comparison between consecutive successful live scans;
+- guided first-run CLI behavior for the packaged executable;
 - a compiled/packageable `archmesh` CLI with clean packed-install smoke testing;
 - source-backed graph nodes can open directly in Cursor, VS Code, or Zed through the local launcher.
 
@@ -135,9 +144,13 @@ A changed file is not automatically broken. An affected feature is not automatic
 
 ### Package status
 
-ArchMesh now builds a real npm-style package with an `archmesh` executable. CI creates a tarball, installs it into a clean temporary npm project, and runs the installed compiled CLI as a consumer smoke test.
+ArchMesh builds a real npm-style package with an `archmesh` executable. CI creates a tarball, installs it into a clean temporary npm project, and runs the installed compiled CLI as a consumer smoke test.
 
-The public npm registry package has **not been claimed as released yet**, so the documented source checkout remains the supported public installation path until the release/package identity is finalized.
+The public npm registry package has **not been claimed as released yet**, so the documented source checkout remains the supported public installation path until the final package identity is chosen. The unscoped npm name is not available to this project; release work will use a deliberate final registry identity while retaining `archmesh` as the executable name.
+
+The intended packaged first run is deliberately simple: run the command with no arguments in an interactive terminal and ArchMesh asks for the project folder, whether to keep the map live, and which editor to use. CI/agents can continue using explicit flags without prompts.
+
+Current source checkout:
 
 ```bash
 git clone https://github.com/Tranz007/ArchMesh.git
@@ -146,7 +159,7 @@ npm install
 npm run atlas -- /absolute/path/to/your/project
 ```
 
-The packaged executable uses the same syntax:
+The packaged executable uses the same explicit syntax when flags are preferred:
 
 ```bash
 archmesh /absolute/path/to/your/project
@@ -369,10 +382,8 @@ Project source
       ▼
  Language plugin host
       │
-      ├── JavaScript / TypeScript (built in)
-      ├── Python (future)
-      ├── JVM (future)
-      └── .NET / others (future)
+      ├── JavaScript / TypeScript
+      └── Python
       │
       ▼
  Shared source graph
@@ -380,12 +391,16 @@ Project source
       ▼
  Framework adapters
       │
-      ├── Next.js semantics
-      ├── Angular / Nest / FastAPI / Spring / ASP.NET ...
-      └── platform-specific evidence
+      ├── Next.js
+      ├── Angular
+      └── FastAPI
       │
       ▼
  Exact ArchMesh graph
+      │
+      ├── system/workspace boundary evidence
+      ├── health + Git impact overlays
+      └── security evidence
       │
       ├────────────┬────────────┬────────────┬────────────┬───────────┐
       ▼            ▼            ▼            ▼            ▼           ▼
@@ -403,7 +418,7 @@ Project source
                                optional watch loop
 ```
 
-The exact graph remains the evidence layer. Language/framework parsers contribute to that shared contract; higher-level views, traces, and comparisons are projections rather than replacements for the underlying relationships.
+The exact graph remains the evidence layer. Language/framework parsers contribute to that shared contract; higher-level views, traces, system blocks, and comparisons are projections rather than replacements for the underlying relationships.
 
 ## Design principles
 
@@ -419,7 +434,7 @@ The exact graph remains the evidence layer. Language/framework parsers contribut
 
 **Progressive investigation over expansion.** Trace begins with one hop and lets the user re-root deliberately instead of expanding an arbitrary number of relationships into another hairball.
 
-**Human architecture over file hairballs.** Start with product areas and features; reveal routes, services, data, files, and source detail progressively.
+**Human architecture over file hairballs.** Start with detected systems and product areas; reveal routes, services, data, files, and source detail progressively.
 
 **Error is not impact. Change is not failure. Drift is structural. Security is independent.** These meanings stay separate throughout the graph and inspector.
 
@@ -428,8 +443,9 @@ The exact graph remains the evidence layer. Language/framework parsers contribut
 ```text
 src/
 ├── plugins/       language plugins, framework adapters, host/merge contracts
-├── scanner/       current JS/TS parsing and static semantics
-├── projections/   architecture/topology/security/trace/change/drift projections
+├── scanner/       JS/TS static semantics and shared scanner helpers
+├── system/        workspace/service/package boundary evidence
+├── projections/   architecture/system/topology/security/trace/change/drift projections
 ├── security/      conservative sensitive-data classification
 ├── health/        health signals and propagation
 ├── changes/       Git change-impact analysis
@@ -445,6 +461,7 @@ src/
 
 ## Documentation
 
+- [Getting started](docs/GETTING_STARTED.md)
 - [Product definition](docs/PRODUCT.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Graph model](docs/GRAPH_MODEL.md)
