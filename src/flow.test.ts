@@ -3,6 +3,8 @@ import {
   canAnimateFlowDirection,
   flowDirectionLabel,
   flowEmissionDelay,
+  flowEmissionDirections,
+  flowParticleDuration,
   flowParticleSpeed,
   flowRenderEndpoints,
   hasReverseFlow,
@@ -42,6 +44,10 @@ describe('directional flow', () => {
       { ...integration, flowDirection: 'source-to-target' },
       { enabled: true, scope: 'all' },
     )).toBe(true);
+    expect(shouldAnimateFlowEdge(
+      { ...integration, flowDirection: 'target-to-source' },
+      { enabled: true, scope: 'all' },
+    )).toBe(true);
   });
 
   it('limits focus flow to the selected node neighborhood', () => {
@@ -64,20 +70,23 @@ describe('directional flow', () => {
     expect(shouldAnimateFlowEdge({ ...callEdge, id: 'edge:other' }, selection)).toBe(false);
   });
 
-  it('keeps reverse flow evidence out of force-layout endpoints', () => {
+  it('animates reverse evidence without changing force-layout endpoints', () => {
     const read = { ...callEdge, relation: 'reads' as const };
     expect(flowRenderEndpoints(read)).toEqual({ source: 'node:a', target: 'node:b' });
     expect(flowParticleSpeed('reads')).toBeGreaterThan(0);
+    expect(flowParticleDuration('reads')).toBeGreaterThan(0);
     expect(flowDirectionLabel('reads')).toBe('target → source');
-    expect(canAnimateFlowDirection(read)).toBe(false);
-    expect(shouldAnimateFlowEdge(read, { enabled: true, scope: 'all' })).toBe(false);
+    expect(canAnimateFlowDirection(read)).toBe(true);
+    expect(hasReverseFlow(read)).toBe(true);
+    expect(flowEmissionDirections(read)).toEqual(['target-to-source']);
+    expect(shouldAnimateFlowEdge(read, { enabled: true, scope: 'all' })).toBe(true);
     expect(flowRenderEndpoints({ ...callEdge, relation: 'writes' as const })).toEqual({
       source: 'node:a',
       target: 'node:b',
     });
   });
 
-  it('keeps bidirectional integration evidence explicit without materializing or animating a second force link', () => {
+  it('expands bidirectional evidence into two visual-only emission directions', () => {
     expect(mergeFlowDirection('source-to-target', 'target-to-source')).toBe('both');
     expect(withMergedFlowDirection(
       { flowDirection: 'source-to-target', securityTransport: 'unknown' },
@@ -92,13 +101,23 @@ describe('directional flow', () => {
       relation: 'integrates-with' as const,
       flowDirection: 'both' as const,
     };
-    expect(hasReverseFlow(integration)).toBe(false);
-    expect(canAnimateFlowDirection(integration)).toBe(false);
-    expect(shouldAnimateFlowEdge(integration, { enabled: true, scope: 'all' })).toBe(false);
+    expect(hasReverseFlow(integration)).toBe(true);
+    expect(canAnimateFlowDirection(integration)).toBe(true);
+    expect(shouldAnimateFlowEdge(integration, { enabled: true, scope: 'all' })).toBe(true);
+    expect(flowEmissionDirections(integration)).toEqual([
+      'source-to-target',
+      'target-to-source',
+    ]);
     expect(flowDirectionLabel('integrates-with', 'both')).toBe('source ↔ target');
   });
 
-  it('uses substantially wider randomized spacing in all-flow than focused flow', () => {
+  it('keeps non-flow dependencies out of the emitter', () => {
+    expect(canAnimateFlowDirection(dependencyEdge)).toBe(false);
+    expect(flowEmissionDirections(dependencyEdge)).toEqual([]);
+    expect(shouldAnimateFlowEdge(dependencyEdge, { enabled: true, scope: 'all' })).toBe(false);
+  });
+
+  it('uses wider randomized spacing in all-flow than focused flow', () => {
     const allFast = flowEmissionDelay(callEdge, { enabled: true, scope: 'all' }, () => 0, false);
     const allSlow = flowEmissionDelay(callEdge, { enabled: true, scope: 'all' }, () => 1, false);
     const focusFast = flowEmissionDelay(callEdge, {
@@ -122,11 +141,33 @@ describe('directional flow', () => {
     });
 
     vi.advanceTimersByTime(1000);
-    expect(emit).toHaveBeenCalled();
+    expect(emit).toHaveBeenCalledWith(callEdge, 'source-to-target');
     const emittedBeforeStop = emit.mock.calls.length;
     stop();
     vi.advanceTimersByTime(5000);
     expect(emit).toHaveBeenCalledTimes(emittedBeforeStop);
+    vi.useRealTimers();
+  });
+
+  it('runs both directions on independent schedules for bidirectional evidence', () => {
+    vi.useFakeTimers();
+    const emit = vi.fn();
+    const integration = {
+      ...callEdge,
+      relation: 'integrates-with' as const,
+      flowDirection: 'both' as const,
+    };
+    const stop = startFlowEmitter({
+      edges: [integration],
+      selection: { enabled: true, scope: 'all' },
+      emit,
+      random: () => 0,
+    });
+
+    vi.advanceTimersByTime(1000);
+    expect(emit).toHaveBeenCalledWith(integration, 'source-to-target');
+    expect(emit).toHaveBeenCalledWith(integration, 'target-to-source');
+    stop();
     vi.useRealTimers();
   });
 
