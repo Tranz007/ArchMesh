@@ -5,6 +5,7 @@ export type ArchitectureLens =
   | 'areas'
   | 'topology'
   | 'request-flow'
+  | 'security'
   | 'changes'
   | 'health'
   | 'drift'

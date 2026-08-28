@@ -61,6 +61,104 @@
 .health-evidence dt { color: #77859c; font-size: 10px; text-transform: uppercase; }
 .health-evidence dd { margin: 0; color: #9ba8bc; font-size: 10px; overflow-wrap: anywhere; }
 
+.security-evidence {
+  margin-top: 15px;
+  padding: 12px;
+  border: 1px solid rgba(112, 190, 255, .28);
+  border-radius: 10px;
+  background: rgba(73, 141, 204, .07);
+}
+
+.security-evidence.risk {
+  border-color: rgba(255, 99, 112, .38);
+  background: rgba(255, 77, 94, .075);
+}
+
+.security-evidence.protected {
+  border-color: rgba(78, 211, 164, .3);
+  background: rgba(78, 211, 164, .06);
+}
+
+.security-evidence-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #93c7ff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+
+.security-evidence.risk .security-evidence-title { color: #ff8c98; }
+.security-evidence.protected .security-evidence-title { color: #78dfbb; }
+
+.security-finding {
+  margin-top: 9px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.security-finding strong {
+  color: #e3e9f2;
+  font-size: 11px;
+}
+
+.security-finding span {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .06);
+  color: #9eabc0;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.security-evidence dl {
+  margin: 10px 0 0;
+  display: grid;
+  gap: 6px;
+}
+
+.security-evidence dl div {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.security-evidence dt {
+  color: #718098;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.security-evidence dd {
+  margin: 0;
+  color: #b4c0d2;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.security-evidence-notes {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(113, 128, 152, .15);
+}
+
+.security-evidence-notes p,
+.security-unknown-note {
+  margin: 0;
+  color: #8e9bb0;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.security-evidence-notes p + p { margin-top: 5px; }
+.security-unknown-note { margin-top: 8px; color: #aab5c6; }
+
 .change-badge,
 .drift-badge {
   display: inline-flex;

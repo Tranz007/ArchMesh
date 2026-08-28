@@ -13,10 +13,13 @@ import {
   History,
   Network,
   Search,
+  ShieldAlert,
+  ShieldCheck,
   XCircle,
 } from 'lucide-react';
 import { GraphCanvas } from './GraphCanvas';
 import { LensPanel } from './LensPanel';
+import { SecurityEvidence } from './SecurityEvidence';
 import { SourceOpenAction } from './SourceOpenAction';
 import {
   projectHealthContext,
@@ -28,6 +31,7 @@ import {
 import { projectArchitecture } from './projections/architecture';
 import { projectChanges } from './projections/changes';
 import { projectDrift } from './projections/drift';
+import { projectSecurity } from './projections/security';
 import { projectTopology } from './projections/topology';
 import { sampleGraph } from './sample-graph';
 import type {
@@ -220,6 +224,7 @@ export default function App() {
   );
   const topologyProjection = useMemo(() => projectTopology(data), [data]);
   const requestFlowProjection = useMemo(() => projectRequestFlow(data), [data]);
+  const securityProjection = useMemo(() => projectSecurity(data), [data]);
   const changesProjection = useMemo(() => projectChanges(data), [data]);
   const driftProjection = useMemo(
     () => projectDrift(driftData ?? emptyDriftView(data)),
@@ -232,11 +237,12 @@ export default function App() {
 
   const visibleData = useMemo(() => {
     if (source === 'demo') return data;
-    if (focusedFeatureId && viewMode === 'architecture') return architectureProjection.graph;
+    if (focusedFeatureId && viewMode === 'architecture' && activeLens !== 'security') return architectureProjection.graph;
     if (activeLens === 'system') return systemProjection;
     if (activeLens === 'areas') return productAreasProjection;
     if (activeLens === 'topology') return topologyProjection;
     if (activeLens === 'request-flow') return requestFlowProjection;
+    if (activeLens === 'security') return securityProjection;
     if (activeLens === 'changes') return changesProjection;
     if (activeLens === 'health') return healthProjection;
     if (activeLens === 'drift') return driftProjection;
@@ -251,6 +257,7 @@ export default function App() {
     healthProjection,
     productAreasProjection,
     requestFlowProjection,
+    securityProjection,
     source,
     systemProjection,
     topologyProjection,
@@ -338,6 +345,13 @@ export default function App() {
     return result;
   }, [visibleData.nodes]);
 
+  const securityCounts = useMemo(() => ({
+    findings: Number(securityProjection.metadata?.securityFindingCount ?? 0),
+    sensitive: Number(securityProjection.metadata?.securitySensitiveFlowCount ?? 0),
+    cleartext: Number(securityProjection.metadata?.securityCleartextCount ?? 0),
+    external: Number(securityProjection.metadata?.securityExternalBoundaryCount ?? 0),
+  }), [securityProjection.metadata]);
+
   const chooseSearchResult = (node: ArchNode) => {
     selectNode(node.id);
     setQuery('');
@@ -364,7 +378,7 @@ export default function App() {
   const activateLens = (lens: ArchitectureLens) => {
     setActiveLens(lens);
     setViewMode(
-      lens === 'system' || lens === 'areas' || lens === 'health'
+      lens === 'system' || lens === 'areas' || lens === 'health' || lens === 'security'
         ? 'architecture'
         : lens === 'topology'
           ? 'topology'
@@ -395,19 +409,21 @@ export default function App() {
   const affectedFeatures = positiveCount(selectedNode?.metadata?.affectedFeatures);
   const hiddenNodes = positiveCount(visibleData.metadata?.hiddenNodes) ?? 0;
 
-  const searchPlaceholder = activeLens === 'request-flow'
-    ? 'Find a route, API, service…'
-    : activeLens === 'health'
-      ? 'Find a failing or impacted area…'
-      : viewMode === 'architecture'
-        ? 'Find a feature, integration, service…'
-        : viewMode === 'topology'
-          ? 'Find a feature, collection, integration…'
-          : viewMode === 'changes'
-            ? 'Find changed or affected code…'
-            : viewMode === 'drift'
-              ? 'Find added, removed, or modified architecture…'
-              : 'Find a route, component, file…';
+  const searchPlaceholder = activeLens === 'security'
+    ? 'Find sensitive data, external systems, security evidence…'
+    : activeLens === 'request-flow'
+      ? 'Find a route, API, service…'
+      : activeLens === 'health'
+        ? 'Find a failing or impacted area…'
+        : viewMode === 'architecture'
+          ? 'Find a feature, integration, service…'
+          : viewMode === 'topology'
+            ? 'Find a feature, collection, integration…'
+            : viewMode === 'changes'
+              ? 'Find changed or affected code…'
+              : viewMode === 'drift'
+                ? 'Find added, removed, or modified architecture…'
+                : 'Find a route, component, file…';
 
   return (
     <main className="app-shell">
@@ -421,7 +437,15 @@ export default function App() {
         </div>
 
         <div className="status-strip" aria-label="Architecture status summary">
-          {viewMode === 'drift' && source === 'scan' ? (
+          {activeLens === 'security' && source === 'scan' ? (
+            <>
+              <span className="status status-security"><ShieldCheck size={14} /> {securityCounts.sensitive} sensitive flows</span>
+              <span className="status status-security-warning"><ShieldAlert size={14} /> {securityCounts.findings} findings</span>
+              {securityCounts.cleartext > 0 && (
+                <span className="status status-error"><XCircle size={14} /> {securityCounts.cleartext} cleartext</span>
+              )}
+            </>
+          ) : viewMode === 'drift' && source === 'scan' ? (
             <>
               <span className="status status-drift-added"><History size={14} /> {counts.added} added</span>
               <span className="status status-drift-removed"><History size={14} /> {counts.removed} removed</span>
@@ -512,7 +536,7 @@ export default function App() {
               </button>
             </div>
           )}
-          {viewMode !== 'changes' && viewMode !== 'drift' && (
+          {viewMode !== 'changes' && viewMode !== 'drift' && activeLens !== 'security' && (
             <button
               type="button"
               className={errorsOnly ? 'active' : ''}
@@ -527,7 +551,7 @@ export default function App() {
         </div>
       </section>
 
-      {source === 'scan' && viewMode === 'architecture' && focusedFeatureId && (
+      {source === 'scan' && viewMode === 'architecture' && focusedFeatureId && activeLens !== 'security' && (
         <div className="focus-bar">
           <button
             type="button"
@@ -547,14 +571,21 @@ export default function App() {
           <GraphCanvas
             data={visibleData}
             errorsOnly={errorsOnly}
-            visualMode={viewMode === 'drift' ? 'drift' : 'default'}
+            visualMode={viewMode === 'drift' ? 'drift' : activeLens === 'security' ? 'security' : 'default'}
             selectedNodeId={selectedNodeId}
             selectedEdgeId={selectedEdgeId}
             onSelectNode={selectNode}
             onSelectEdge={selectEdge}
           />
           <div className="legend" aria-label="Graph legend">
-            {viewMode === 'drift' ? (
+            {activeLens === 'security' ? (
+              <>
+                <span><i className="legend-dot security-sensitive" />Sensitive data</span>
+                <span><i className="legend-dot security-tls" />TLS requested</span>
+                <span><i className="legend-dot security-unknown" />Unknown protection</span>
+                <span><i className="legend-dot security-risk" />Security finding</span>
+              </>
+            ) : viewMode === 'drift' ? (
               <>
                 <span><i className="legend-dot drift-added" />Added</span>
                 <span><i className="legend-dot drift-removed" />Removed</span>
@@ -602,6 +633,7 @@ export default function App() {
               </div>
 
               <HealthEvidence health={selectedEdge.health} metadata={selectedEdge.metadata} />
+              <SecurityEvidence metadata={selectedEdge.metadata} />
               <DriftNote drift={selectedEdge.drift} />
 
               {selectedEdge.health === 'impacted' && (
@@ -628,6 +660,7 @@ export default function App() {
               )}
 
               <HealthEvidence health={selectedNode.health} metadata={selectedNode.metadata} />
+              <SecurityEvidence metadata={selectedNode.metadata} />
               <DriftNote drift={selectedNode.drift} />
 
               {(routePath || httpMethods || serverActionCount || semanticSource || provider || resourceType) && (
@@ -683,7 +716,7 @@ export default function App() {
                 </p>
               )}
 
-              {source === 'scan' && viewMode === 'architecture' && selectedNode.kind === 'feature' && !focusedFeatureId && (
+              {source === 'scan' && viewMode === 'architecture' && activeLens !== 'security' && selectedNode.kind === 'feature' && !focusedFeatureId && (
                 <button
                   type="button"
                   className="primary-action"

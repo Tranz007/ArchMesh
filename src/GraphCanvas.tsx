@@ -29,6 +29,8 @@ import type {
   HealthState,
 } from './types';
 
+type VisualMode = 'default' | 'drift' | 'security';
+
 const healthColor: Record<HealthState, string> = {
   healthy: '#7f8da8',
   warning: '#f0b44d',
@@ -150,6 +152,12 @@ interface RenderLink {
   change: ChangeState;
   drift: DriftState;
   baseColor: string;
+  securitySensitiveData: boolean;
+  securityTransport?: string;
+  securityFinding?: string;
+  securitySeverity?: string;
+  securityExternalBoundary: boolean;
+  securityBoundary?: string;
 }
 
 function stableCoordinate(id: string, salt: number) {
@@ -183,18 +191,30 @@ function graphColor(
   change: ChangeState | undefined,
   drift: DriftState | undefined,
   healthyDefault: string,
-  visualMode: 'default' | 'drift',
+  visualMode: VisualMode,
 ) {
   if (visualMode === 'drift') return driftColor[drift ?? 'stable'];
   if (health === 'error' || health === 'warning' || health === 'impacted') return healthColor[health];
-  if (change === 'changed' || change === 'affected') return changeColor[change];
+  if (visualMode !== 'security' && (change === 'changed' || change === 'affected')) return changeColor[change];
   return healthyDefault;
 }
 
-function nodeColor(kind: string, health: HealthState, drift: DriftState, visualMode: 'default' | 'drift') {
+function nodeColor(kind: string, health: HealthState, drift: DriftState, visualMode: VisualMode) {
   if (visualMode === 'drift') return driftColor[drift];
   if (health === 'error' || health === 'warning' || health === 'impacted') return healthColor[health];
   return semanticKindColor[kind] ?? semanticKindColor.unknown;
+}
+
+function securityEdgeColor(edge: ArchEdge) {
+  const metadata = edge.metadata;
+  if (metadata?.securityFinding === 'sensitive-data-over-cleartext' || metadata?.securitySeverity === 'high') return '#ff5364';
+  if (metadata?.securityTransport === 'cleartext') return '#f0a84b';
+  if (metadata?.securitySensitiveData === true && metadata?.securityTransport === 'tls-requested') return '#4fd1a1';
+  if (metadata?.securitySensitiveData === true && metadata?.securityTransport === 'unknown') return '#e5b957';
+  if (metadata?.securitySensitiveData === true) return '#75d8bd';
+  if (metadata?.securityExternalBoundary === true && metadata?.securityTransport === 'tls-requested') return '#61b9db';
+  if (metadata?.securityTransport === 'unknown' || metadata?.securityBoundary === 'managed-service') return '#7b879c';
+  return '#3c4960';
 }
 
 function endpointId(endpoint: string | RenderNode) {
@@ -229,7 +249,7 @@ function geometryForKind(kind: string, radius: number): BufferGeometry {
 interface GraphCanvasProps {
   data: ArchGraphData;
   errorsOnly: boolean;
-  visualMode?: 'default' | 'drift';
+  visualMode?: VisualMode;
   selectedNodeId?: string;
   selectedEdgeId?: string;
   onSelectNode: (nodeId?: string) => void;
@@ -337,7 +357,15 @@ export function GraphCanvas({
         health: edge.health,
         change: edge.change ?? 'unchanged',
         drift: edge.drift ?? 'stable',
-        baseColor: graphColor(edge.health, edge.change, edge.drift, '#3c4960', visualMode),
+        baseColor: visualMode === 'security'
+          ? securityEdgeColor(edge)
+          : graphColor(edge.health, edge.change, edge.drift, '#3c4960', visualMode),
+        securitySensitiveData: edge.metadata?.securitySensitiveData === true,
+        securityTransport: typeof edge.metadata?.securityTransport === 'string' ? edge.metadata.securityTransport : undefined,
+        securityFinding: typeof edge.metadata?.securityFinding === 'string' ? edge.metadata.securityFinding : undefined,
+        securitySeverity: typeof edge.metadata?.securitySeverity === 'string' ? edge.metadata.securitySeverity : undefined,
+        securityExternalBoundary: edge.metadata?.securityExternalBoundary === true,
+        securityBoundary: typeof edge.metadata?.securityBoundary === 'string' ? edge.metadata.securityBoundary : undefined,
       }));
 
     return { nodes, links };
@@ -391,6 +419,7 @@ export function GraphCanvas({
   const isFlowLinkActive = (link: RenderLink) => shouldAnimateFlowEdge(flowEdge(link), flowSelection);
 
   const flowColor = (link: RenderLink) => {
+    if (visualMode === 'security') return link.baseColor;
     if (link.health === 'error' || link.health === 'warning' || link.health === 'impacted') return link.baseColor;
     return flowRelationColor[link.relation] ?? '#9ec5ff';
   };
@@ -463,7 +492,7 @@ export function GraphCanvas({
           const mesh = new Mesh(geometryForKind(typedNode.kind, radius), material);
           group.add(mesh);
 
-          if (!faded && visualMode !== 'drift' && (typedNode.change === 'changed' || typedNode.change === 'affected')) {
+          if (!faded && visualMode !== 'drift' && visualMode !== 'security' && (typedNode.change === 'changed' || typedNode.change === 'affected')) {
             const shell = new Mesh(
               new SphereGeometry(radius * 1.28, 12, 9),
               new MeshBasicMaterial({
@@ -502,12 +531,18 @@ export function GraphCanvas({
           if (isFlowLinkActive(typedLink) && !isLinkFaded(typedLink)) return flowColor(typedLink);
           return isLinkFaded(typedLink) ? '#20283a' : typedLink.baseColor;
         }}
-        linkOpacity={0.55}
+        linkOpacity={visualMode === 'security' ? 0.72 : 0.55}
         linkWidth={(link) => {
           const typedLink = link as RenderLink;
           if (typedLink.id === selectedEdgeId) return isFlowLinkActive(typedLink) ? 1.6 : 2.4;
           if (isLinkFaded(typedLink)) return 0.1;
           if (isFlowLinkActive(typedLink)) return flowScope === 'focus' ? 0.72 : 0.48;
+          if (visualMode === 'security') {
+            if (typedLink.securityFinding || typedLink.securityTransport === 'cleartext') return 1.8;
+            if (typedLink.securitySensitiveData) return 1.05;
+            if (typedLink.securityExternalBoundary) return 0.75;
+            return 0.52;
+          }
           if (visualMode === 'drift') {
             return typedLink.drift === 'stable' ? 0.25 : typedLink.drift === 'modified' ? 1.8 : 1.25;
           }
@@ -521,6 +556,11 @@ export function GraphCanvas({
         linkResolution={6}
         linkLabel={(link) => {
           const typedLink = link as RenderLink;
+          if (visualMode === 'security') {
+            const security = typedLink.securityFinding
+              ?? (typedLink.securitySensitiveData ? 'sensitive data' : typedLink.securityTransport ?? typedLink.securityBoundary ?? 'security evidence');
+            return `${typedLink.label} · ${security}`;
+          }
           return `${typedLink.label} · ${typedLink.health}`;
         }}
         linkHoverPrecision={5}
@@ -606,9 +646,11 @@ export function GraphCanvas({
         </div>
         <span aria-hidden="true">
           {flowEnabled
-            ? flowScope === 'focus'
-              ? 'Pulses follow detected data direction around the selection'
-              : 'Pulses follow detected data direction; reads travel back to the reader'
+            ? visualMode === 'security'
+              ? 'Security colors stay on the connection while pulses show detected data direction'
+              : flowScope === 'focus'
+                ? 'Pulses follow detected data direction around the selection'
+                : 'Pulses follow detected data direction; reads travel back to the reader'
             : 'Drag to orbit · Scroll to zoom · Right-drag to pan'}
         </span>
       </div>
