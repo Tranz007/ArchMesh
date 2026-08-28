@@ -15,7 +15,14 @@ import {
   TetrahedronGeometry,
 } from 'three';
 import SpriteText from 'three-spritetext';
+import {
+  flowParticleCount,
+  flowParticleSpeed,
+  shouldAnimateFlowEdge,
+  type FlowScope,
+} from './flow';
 import type {
+  ArchEdge,
   ArchGraphData,
   ChangeState,
   DriftState,
@@ -41,6 +48,13 @@ const driftColor: Record<DriftState, string> = {
   added: '#34d399',
   removed: '#f472b6',
   modified: '#fbbf24',
+};
+
+const flowRelationColor: Partial<Record<ArchEdge['relation'], string>> = {
+  calls: '#72d4ff',
+  reads: '#6ee7c4',
+  writes: '#f4c86d',
+  'integrates-with': '#c99cff',
 };
 
 export const semanticKindColor: Record<string, string> = {
@@ -131,7 +145,7 @@ interface RenderLink {
   source: string | RenderNode;
   target: string | RenderNode;
   label: string;
-  relation: string;
+  relation: ArchEdge['relation'];
   health: HealthState;
   change: ChangeState;
   drift: DriftState;
@@ -234,6 +248,8 @@ export function GraphCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
   const [size, setSize] = useState({ width: 1, height: 1 });
+  const [flowEnabled, setFlowEnabled] = useState(false);
+  const [flowScope, setFlowScope] = useState<FlowScope>('all');
   const fittedGraphRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -253,6 +269,12 @@ export function GraphCanvas({
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (flowEnabled && flowScope === 'focus' && !selectedNodeId && !selectedEdgeId) {
+      setFlowScope('all');
+    }
+  }, [flowEnabled, flowScope, selectedEdgeId, selectedNodeId]);
 
   const graphData = useMemo(() => {
     const visibleNodes = new Set<string>();
@@ -340,6 +362,13 @@ export function GraphCanvas({
     return { edgeEndpoints, neighbors };
   }, [data.edges, selectedEdgeId, selectedNodeId]);
 
+  const flowSelection = useMemo(() => ({
+    enabled: flowEnabled,
+    scope: flowScope,
+    selectedNodeId,
+    selectedEdgeId,
+  }), [flowEnabled, flowScope, selectedEdgeId, selectedNodeId]);
+
   const isNodeFaded = (node: RenderNode) => {
     if (selection.edgeEndpoints) return !selection.edgeEndpoints.has(node.id);
     if (!selectedNodeId) return false;
@@ -352,6 +381,20 @@ export function GraphCanvas({
     return endpointId(link.source) !== selectedNodeId && endpointId(link.target) !== selectedNodeId;
   };
 
+  const flowEdge = (link: RenderLink) => ({
+    id: link.id,
+    source: endpointId(link.source),
+    target: endpointId(link.target),
+    relation: link.relation,
+  });
+
+  const isFlowLinkActive = (link: RenderLink) => shouldAnimateFlowEdge(flowEdge(link), flowSelection);
+
+  const flowColor = (link: RenderLink) => {
+    if (link.health === 'error' || link.health === 'warning' || link.health === 'impacted') return link.baseColor;
+    return flowRelationColor[link.relation] ?? '#9ec5ff';
+  };
+
   const graphIdentity = useMemo(
     () => `${visualMode}:${errorsOnly ? 'errors' : 'all'}:${graphData.nodes.map((node) => node.id).join('|')}`,
     [errorsOnly, graphData.nodes, visualMode],
@@ -360,6 +403,14 @@ export function GraphCanvas({
   const fitGraph = () => {
     fittedGraphRef.current = graphIdentity;
     graphRef.current?.zoomToFit(450, 72);
+  };
+
+  const toggleFlow = () => {
+    setFlowEnabled((enabled) => {
+      const next = !enabled;
+      if (next) setFlowScope(selectedNodeId || selectedEdgeId ? 'focus' : 'all');
+      return next;
+    });
   };
 
   return (
@@ -448,6 +499,7 @@ export function GraphCanvas({
         }}
         linkColor={(link) => {
           const typedLink = link as RenderLink;
+          if (isFlowLinkActive(typedLink) && !isLinkFaded(typedLink)) return flowColor(typedLink);
           return isLinkFaded(typedLink) ? '#20283a' : typedLink.baseColor;
         }}
         linkOpacity={0.55}
@@ -455,6 +507,7 @@ export function GraphCanvas({
           const typedLink = link as RenderLink;
           if (typedLink.id === selectedEdgeId) return 3.4;
           if (isLinkFaded(typedLink)) return 0.12;
+          if (isFlowLinkActive(typedLink)) return flowScope === 'focus' ? 1.35 : 0.82;
           if (visualMode === 'drift') {
             return typedLink.drift === 'stable' ? 0.25 : typedLink.drift === 'modified' ? 1.8 : 1.25;
           }
@@ -475,21 +528,27 @@ export function GraphCanvas({
           const typedLink = link as RenderLink;
           if (isLinkFaded(typedLink)) return 0;
           if (typedLink.id === selectedEdgeId) return 4;
+          if (isFlowLinkActive(typedLink)) return flowScope === 'focus' ? 3.1 : 1.7;
           if (typedLink.health === 'error' || typedLink.health === 'impacted') return 2.3;
           return 0;
         }}
         linkDirectionalArrowRelPos={0.82}
-        linkDirectionalArrowColor={(link) => (link as RenderLink).baseColor}
+        linkDirectionalArrowColor={(link) => {
+          const typedLink = link as RenderLink;
+          return isFlowLinkActive(typedLink) ? flowColor(typedLink) : typedLink.baseColor;
+        }}
         linkDirectionalParticles={(link) => {
           const typedLink = link as RenderLink;
-          if (isLinkFaded(typedLink)) return 0;
-          if (typedLink.id === selectedEdgeId) return 4;
-          if (typedLink.health === 'error') return 2;
-          return 0;
+          return flowParticleCount(flowEdge(typedLink), flowSelection);
         }}
-        linkDirectionalParticleWidth={(link) => (link as RenderLink).id === selectedEdgeId ? 2.4 : 1.5}
-        linkDirectionalParticleSpeed={0.004}
-        linkDirectionalParticleColor={(link) => (link as RenderLink).baseColor}
+        linkDirectionalParticleWidth={(link) => {
+          const typedLink = link as RenderLink;
+          if (!isFlowLinkActive(typedLink)) return 0;
+          if (typedLink.id === selectedEdgeId) return 3;
+          return flowScope === 'focus' ? 2.25 : 1.45;
+        }}
+        linkDirectionalParticleSpeed={(link) => flowParticleSpeed((link as RenderLink).relation)}
+        linkDirectionalParticleColor={(link) => flowColor(link as RenderLink)}
         onNodeClick={(node) => {
           const typedNode = node as RenderNode;
           onSelectEdge(undefined);
@@ -511,7 +570,47 @@ export function GraphCanvas({
       />
       <div className="graph-controls">
         <button type="button" onClick={fitGraph}>Fit graph</button>
-        <span aria-hidden="true">Drag to orbit · Scroll to zoom · Right-drag to pan</span>
+        <div className="flow-controls" role="group" aria-label="Directional flow controls">
+          <button
+            type="button"
+            className={flowEnabled ? 'active' : ''}
+            aria-pressed={flowEnabled}
+            onClick={toggleFlow}
+            title="Animate directional calls, reads, writes, and integrations"
+          >
+            Flow {flowEnabled ? 'on' : 'off'}
+          </button>
+          {flowEnabled && (
+            <>
+              <button
+                type="button"
+                className={flowScope === 'focus' ? 'active secondary' : 'secondary'}
+                aria-pressed={flowScope === 'focus'}
+                disabled={!selectedNodeId && !selectedEdgeId}
+                onClick={() => setFlowScope('focus')}
+                title="Animate only the selected node or connection"
+              >
+                Focus
+              </button>
+              <button
+                type="button"
+                className={flowScope === 'all' ? 'active secondary' : 'secondary'}
+                aria-pressed={flowScope === 'all'}
+                onClick={() => setFlowScope('all')}
+                title="Animate every visible runtime and data flow"
+              >
+                All
+              </button>
+            </>
+          )}
+        </div>
+        <span aria-hidden="true">
+          {flowEnabled
+            ? flowScope === 'focus'
+              ? 'Pulses follow selected source → target flow'
+              : 'Pulses follow visible source → target flow'
+            : 'Drag to orbit · Scroll to zoom · Right-drag to pan'}
+        </span>
       </div>
     </div>
   );
