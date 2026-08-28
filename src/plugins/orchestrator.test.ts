@@ -14,6 +14,7 @@ function languagePlugin(id: string, result: ArchGraphData): LanguagePlugin {
     displayName: id,
     languages: [id],
     extensions: [`.${id}`],
+    capabilities: ['source-files', 'imports'],
     scan: async () => result,
   };
 }
@@ -51,6 +52,7 @@ describe('scanProjectWithPlugins', () => {
     expect(result.metadata).toMatchObject({
       languagePluginCount: 2,
       languagePlugins: 'alpha, beta',
+      languageCapabilities: 'imports, source-files',
       frameworkAdapterCount: 0,
     });
   });
@@ -64,6 +66,7 @@ describe('scanProjectWithPlugins', () => {
       id: 'example-framework',
       displayName: 'Example Framework',
       languagePluginIds: ['javascript-typescript'],
+      capabilities: ['routes'],
       detect: ({ graph: current }) => current.nodes.some((node) => node.id === 'file:src/app.ts'),
       enrich: async () => ({
         nodes: [{
@@ -88,6 +91,7 @@ describe('scanProjectWithPlugins', () => {
     expect(result.metadata).toMatchObject({
       frameworkAdapterCount: 1,
       frameworkAdapters: 'example-framework',
+      frameworkCapabilities: 'routes',
     });
   });
 
@@ -99,6 +103,7 @@ describe('scanProjectWithPlugins', () => {
       id: 'nextjs',
       displayName: 'Next.js',
       languagePluginIds: ['javascript-typescript'],
+      capabilities: ['routes'],
       detect: () => {
         called = true;
         return true;
@@ -113,5 +118,17 @@ describe('scanProjectWithPlugins', () => {
 
     expect(called).toBe(false);
     expect(result.metadata).toMatchObject({ languagePluginCount: 0, frameworkAdapterCount: 0 });
+  });
+
+  it('rejects plugins built for an incompatible host API', async () => {
+    const incompatible = {
+      ...languagePlugin('future', graph('repo', [])),
+      apiVersion: 2,
+    } as unknown as LanguagePlugin;
+
+    await expect(scanProjectWithPlugins('/tmp/repo', {
+      languagePlugins: [incompatible],
+      frameworkAdapters: [],
+    })).rejects.toThrow('targets ArchMesh plugin API v2');
   });
 });
