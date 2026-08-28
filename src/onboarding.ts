@@ -15,7 +15,7 @@ export function shouldRunGuidedOnboarding(
   argv: string[],
   stdinIsTTY = Boolean(process.stdin.isTTY),
   stdoutIsTTY = Boolean(process.stdout.isTTY),
-  allowImplicit = true,
+  allowImplicit = process.env.npm_lifecycle_event !== 'atlas',
 ) {
   const explicit = argv.length === 1 && argv[0] === '--guided';
   const requested = explicit || (allowImplicit && argv.length === 0);
