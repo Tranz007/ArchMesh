@@ -96,7 +96,7 @@ jobs:
 
           test -s /tmp/archmesh-viewer.png
 
-      - name: Render 39-node fallback System Map
+      - name: Render 39-node detected System Map
         shell: bash
         run: |
           set -euo pipefail
