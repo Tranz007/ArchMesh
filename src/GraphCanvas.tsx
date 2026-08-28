@@ -16,9 +16,10 @@ import {
 } from 'three';
 import SpriteText from 'three-spritetext';
 import {
-  flowParticleCount,
   flowParticleSpeed,
+  flowRenderEndpoints,
   shouldAnimateFlowEdge,
+  startFlowEmitter,
   type FlowScope,
 } from './flow';
 import type {
@@ -151,6 +152,8 @@ interface RenderLink {
   id: string;
   source: string | RenderNode;
   target: string | RenderNode;
+  evidenceSource: string;
+  evidenceTarget: string;
   label: string;
   relation: ArchEdge['relation'];
   health: HealthState;
@@ -278,6 +281,7 @@ export function GraphCanvas({
   const [flowEnabled, setFlowEnabled] = useState(false);
   const [flowScope, setFlowScope] = useState<FlowScope>('all');
   const fittedGraphRef = useRef<string | undefined>(undefined);
+  const previousFlowSelectionRef = useRef('');
 
   useEffect(() => {
     const container = containerRef.current;
@@ -298,9 +302,19 @@ export function GraphCanvas({
   }, []);
 
   useEffect(() => {
-    if (flowEnabled && flowScope === 'focus' && !selectedNodeId && !selectedEdgeId) {
+    const selectionKey = selectedEdgeId
+      ? `edge:${selectedEdgeId}`
+      : selectedNodeId
+        ? `node:${selectedNodeId}`
+        : '';
+
+    if (flowEnabled && selectionKey && selectionKey !== previousFlowSelectionRef.current) {
+      setFlowScope('focus');
+    } else if (flowEnabled && !selectionKey && flowScope === 'focus') {
       setFlowScope('all');
     }
+
+    previousFlowSelectionRef.current = selectionKey;
   }, [flowEnabled, flowScope, selectedEdgeId, selectedNodeId]);
 
   const graphData = useMemo(() => {
@@ -355,25 +369,30 @@ export function GraphCanvas({
     const links: RenderLink[] = data.edges
       .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
       .filter((edge) => !errorsOnly || edge.health !== 'healthy')
-      .map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        label: edge.label ?? edge.relation,
-        relation: edge.relation,
-        health: edge.health,
-        change: edge.change ?? 'unchanged',
-        drift: edge.drift ?? 'stable',
-        baseColor: visualMode === 'security'
-          ? securityEdgeColor(edge)
-          : graphColor(edge.health, edge.change, edge.drift, '#3c4960', visualMode),
-        securitySensitiveData: edge.metadata?.securitySensitiveData === true,
-        securityTransport: typeof edge.metadata?.securityTransport === 'string' ? edge.metadata.securityTransport : undefined,
-        securityFinding: typeof edge.metadata?.securityFinding === 'string' ? edge.metadata.securityFinding : undefined,
-        securitySeverity: typeof edge.metadata?.securitySeverity === 'string' ? edge.metadata.securitySeverity : undefined,
-        securityExternalBoundary: edge.metadata?.securityExternalBoundary === true,
-        securityBoundary: typeof edge.metadata?.securityBoundary === 'string' ? edge.metadata.securityBoundary : undefined,
-      }));
+      .map((edge) => {
+        const renderEndpoints = flowRenderEndpoints(edge);
+        return {
+          id: edge.id,
+          source: renderEndpoints.source,
+          target: renderEndpoints.target,
+          evidenceSource: edge.source,
+          evidenceTarget: edge.target,
+          label: edge.label ?? edge.relation,
+          relation: edge.relation,
+          health: edge.health,
+          change: edge.change ?? 'unchanged',
+          drift: edge.drift ?? 'stable',
+          baseColor: visualMode === 'security'
+            ? securityEdgeColor(edge)
+            : graphColor(edge.health, edge.change, edge.drift, '#3c4960', visualMode),
+          securitySensitiveData: edge.metadata?.securitySensitiveData === true,
+          securityTransport: typeof edge.metadata?.securityTransport === 'string' ? edge.metadata.securityTransport : undefined,
+          securityFinding: typeof edge.metadata?.securityFinding === 'string' ? edge.metadata.securityFinding : undefined,
+          securitySeverity: typeof edge.metadata?.securitySeverity === 'string' ? edge.metadata.securitySeverity : undefined,
+          securityExternalBoundary: edge.metadata?.securityExternalBoundary === true,
+          securityBoundary: typeof edge.metadata?.securityBoundary === 'string' ? edge.metadata.securityBoundary : undefined,
+        };
+      });
 
     return { nodes, links };
   }, [data, errorsOnly, visualMode]);
@@ -413,13 +432,13 @@ export function GraphCanvas({
   const isLinkFaded = (link: RenderLink) => {
     if (selectedEdgeId) return link.id !== selectedEdgeId;
     if (!selectedNodeId) return false;
-    return endpointId(link.source) !== selectedNodeId && endpointId(link.target) !== selectedNodeId;
+    return link.evidenceSource !== selectedNodeId && link.evidenceTarget !== selectedNodeId;
   };
 
   const flowEdge = (link: RenderLink) => ({
     id: link.id,
-    source: endpointId(link.source),
-    target: endpointId(link.target),
+    source: link.evidenceSource,
+    target: link.evidenceTarget,
     relation: link.relation,
   });
 
@@ -430,6 +449,21 @@ export function GraphCanvas({
     if (link.health === 'error' || link.health === 'warning' || link.health === 'impacted') return link.baseColor;
     return flowRelationColor[link.relation] ?? '#9ec5ff';
   };
+
+  useEffect(() => {
+    if (!flowEnabled) return undefined;
+
+    const emitterEdges = graphData.links.map((link) => ({
+      ...flowEdge(link),
+      renderLink: link,
+    }));
+
+    return startFlowEmitter({
+      edges: emitterEdges,
+      selection: flowSelection,
+      emit: ({ renderLink }) => graphRef.current?.emitParticle(renderLink),
+    });
+  }, [flowEnabled, flowSelection, graphData.links]);
 
   const graphIdentity = useMemo(
     () => `${visualMode}:${errorsOnly ? 'errors' : 'all'}:${graphData.nodes.map((node) => node.id).join('|')}`,
@@ -548,15 +582,15 @@ export function GraphCanvas({
         }}
         linkColor={(link) => {
           const typedLink = link as RenderLink;
-          if (isFlowLinkActive(typedLink) && !isLinkFaded(typedLink)) return flowColor(typedLink);
-          return isLinkFaded(typedLink) ? '#20283a' : typedLink.baseColor;
+          if (flowScope === 'focus' && isFlowLinkActive(typedLink) && !isLinkFaded(typedLink)) return flowColor(typedLink);
+          return isLinkFaded(typedLink) ? '#1b2232' : typedLink.baseColor;
         }}
         linkOpacity={visualMode === 'security' ? 0.72 : 0.55}
         linkWidth={(link) => {
           const typedLink = link as RenderLink;
-          if (typedLink.id === selectedEdgeId) return isFlowLinkActive(typedLink) ? 1.6 : 2.4;
-          if (isLinkFaded(typedLink)) return 0.1;
-          if (isFlowLinkActive(typedLink)) return flowScope === 'focus' ? 0.72 : 0.48;
+          if (typedLink.id === selectedEdgeId) return isFlowLinkActive(typedLink) ? 1.15 : 2.4;
+          if (isLinkFaded(typedLink)) return 0.035;
+          if (flowScope === 'focus' && isFlowLinkActive(typedLink)) return 0.5;
           if (visualMode === 'security') {
             if (typedLink.securityFinding || typedLink.securityTransport === 'cleartext') return 1.8;
             if (typedLink.securitySensitiveData) return 1.05;
@@ -587,8 +621,8 @@ export function GraphCanvas({
         linkDirectionalArrowLength={(link) => {
           const typedLink = link as RenderLink;
           if (isLinkFaded(typedLink)) return 0;
-          if (typedLink.id === selectedEdgeId) return isFlowLinkActive(typedLink) ? 2 : 3;
-          if (isFlowLinkActive(typedLink)) return flowScope === 'focus' ? 1.45 : 0.9;
+          if (typedLink.id === selectedEdgeId) return isFlowLinkActive(typedLink) ? 1.7 : 3;
+          if (flowScope === 'focus' && isFlowLinkActive(typedLink)) return 1.05;
           if (typedLink.health === 'error' || typedLink.health === 'impacted') return 2.3;
           return 0;
         }}
@@ -597,15 +631,12 @@ export function GraphCanvas({
           const typedLink = link as RenderLink;
           return isFlowLinkActive(typedLink) ? flowColor(typedLink) : typedLink.baseColor;
         }}
-        linkDirectionalParticles={(link) => {
-          const typedLink = link as RenderLink;
-          return flowParticleCount(flowEdge(typedLink), flowSelection);
-        }}
+        linkDirectionalParticles={0}
         linkDirectionalParticleWidth={(link) => {
           const typedLink = link as RenderLink;
           if (!isFlowLinkActive(typedLink)) return 0;
-          if (typedLink.id === selectedEdgeId) return 1.15;
-          return flowScope === 'focus' ? 0.82 : 0.58;
+          if (typedLink.id === selectedEdgeId) return 0.48;
+          return flowScope === 'focus' ? 0.34 : 0.24;
         }}
         linkDirectionalParticleSpeed={(link) => flowParticleSpeed((link as RenderLink).relation)}
         linkDirectionalParticleColor={(link) => flowColor(link as RenderLink)}
@@ -636,7 +667,7 @@ export function GraphCanvas({
             className={flowEnabled ? 'active' : ''}
             aria-pressed={flowEnabled}
             onClick={toggleFlow}
-            title="Animate directional calls, reads, writes, and integrations"
+            title="Animate illustrative directional calls, reads, writes, and integrations"
           >
             Flow {flowEnabled ? 'on' : 'off'}
           </button>
@@ -657,7 +688,7 @@ export function GraphCanvas({
                 className={flowScope === 'all' ? 'active secondary' : 'secondary'}
                 aria-pressed={flowScope === 'all'}
                 onClick={() => setFlowScope('all')}
-                title="Animate every visible runtime and data flow"
+                title="Simulate intermittent pulses across every visible runtime and data flow"
               >
                 All
               </button>
@@ -667,10 +698,10 @@ export function GraphCanvas({
         <span aria-hidden="true">
           {flowEnabled
             ? visualMode === 'security'
-              ? 'Security colors stay on the connection while pulses show detected data direction'
+              ? 'Illustrative pulses show detected direction; security colors remain evidence-based'
               : flowScope === 'focus'
-                ? 'Pulses follow detected data direction around the selection'
-                : 'Pulses follow detected data direction; reads travel back to the reader'
+                ? 'Illustrative pulses are staggered around the selection · not runtime traffic volume'
+                : 'Illustrative pulses are staggered from static evidence · not runtime traffic volume'
             : 'Drag to orbit · Scroll to zoom · Right-drag to pan'}
         </span>
       </div>

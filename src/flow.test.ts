@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   flowDirectionLabel,
-  flowParticleCount,
+  flowEmissionDelay,
   flowParticleSpeed,
+  flowRenderEndpoints,
   isDirectionalFlowRelation,
   shouldAnimateFlowEdge,
+  startFlowEmitter,
 } from './flow';
 
 const callEdge = {
@@ -31,13 +33,6 @@ describe('directional flow', () => {
     expect(isDirectionalFlowRelation('contains')).toBe(false);
   });
 
-  it('keeps all-flow visually lightweight', () => {
-    const selection = { enabled: true, scope: 'all' as const };
-    expect(shouldAnimateFlowEdge(callEdge, selection)).toBe(true);
-    expect(shouldAnimateFlowEdge(dependencyEdge, selection)).toBe(false);
-    expect(flowParticleCount(callEdge, selection)).toBe(1);
-  });
-
   it('limits focus flow to the selected node neighborhood', () => {
     const selection = {
       enabled: true,
@@ -46,23 +41,59 @@ describe('directional flow', () => {
     };
     expect(shouldAnimateFlowEdge(callEdge, selection)).toBe(true);
     expect(shouldAnimateFlowEdge({ ...callEdge, id: 'edge:other', source: 'node:x' }, selection)).toBe(false);
-    expect(flowParticleCount(callEdge, selection)).toBe(2);
   });
 
-  it('uses only a few particles for a selected edge', () => {
+  it('limits a selected-edge focus to that exact connection', () => {
     const selection = {
       enabled: true,
       scope: 'focus' as const,
       selectedEdgeId: callEdge.id,
     };
-    expect(flowParticleCount(callEdge, selection)).toBe(3);
+    expect(shouldAnimateFlowEdge(callEdge, selection)).toBe(true);
+    expect(shouldAnimateFlowEdge({ ...callEdge, id: 'edge:other' }, selection)).toBe(false);
   });
 
-  it('moves read data from the resource back to the reader', () => {
-    expect(flowParticleSpeed('reads')).toBeLessThan(0);
+  it('renders read data resource-to-reader without relying on negative speed', () => {
+    const read = { ...callEdge, relation: 'reads' as const };
+    expect(flowRenderEndpoints(read)).toEqual({ source: 'node:b', target: 'node:a' });
+    expect(flowParticleSpeed('reads')).toBeGreaterThan(0);
     expect(flowDirectionLabel('reads')).toBe('target → source');
-    expect(flowParticleSpeed('writes')).toBeGreaterThan(0);
-    expect(flowDirectionLabel('writes')).toBe('source → target');
+    expect(flowRenderEndpoints({ ...callEdge, relation: 'writes' as const })).toEqual({
+      source: 'node:a',
+      target: 'node:b',
+    });
+  });
+
+  it('uses substantially wider randomized spacing in all-flow than focused flow', () => {
+    const allFast = flowEmissionDelay(callEdge, { enabled: true, scope: 'all' }, () => 0, false);
+    const allSlow = flowEmissionDelay(callEdge, { enabled: true, scope: 'all' }, () => 1, false);
+    const focusFast = flowEmissionDelay(callEdge, {
+      enabled: true,
+      scope: 'focus',
+      selectedNodeId: 'node:a',
+    }, () => 0, false);
+
+    expect(allFast).toBeGreaterThan(focusFast);
+    expect(allSlow).toBeGreaterThan(allFast);
+  });
+
+  it('emits independent one-shot pulses and stops scheduling on cleanup', () => {
+    vi.useFakeTimers();
+    const emit = vi.fn();
+    const stop = startFlowEmitter({
+      edges: [callEdge],
+      selection: { enabled: true, scope: 'focus', selectedNodeId: 'node:a' },
+      emit,
+      random: () => 0,
+    });
+
+    vi.advanceTimersByTime(1000);
+    expect(emit).toHaveBeenCalled();
+    const emittedBeforeStop = emit.mock.calls.length;
+    stop();
+    vi.advanceTimersByTime(5000);
+    expect(emit).toHaveBeenCalledTimes(emittedBeforeStop);
+    vi.useRealTimers();
   });
 
   it('does not animate when flow is disabled', () => {
