@@ -1,4 +1,4 @@
-import type { GraphMetadata } from '../types';
+import type { GraphMetadata } from '../types.js';
 
 export type SensitiveDataCategory = 'pii' | 'credential' | 'financial' | 'identifier';
 
