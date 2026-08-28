@@ -26,6 +26,17 @@ const sceneKindWeight: Partial<Record<NodeKind, number>> = {
   component: 55,
 };
 
+const sceneKindCap: Partial<Record<NodeKind, number>> = {
+  integration: 3,
+  feature: 3,
+  system: 2,
+  api: 2,
+  data: 2,
+  service: 2,
+  route: 2,
+  component: 1,
+};
+
 function degreeMap(data: ArchGraphData) {
   const degree = new Map<string, number>();
   for (const edge of data.edges) {
@@ -61,8 +72,7 @@ export function sceneFromNode(
 
 export function deriveSceneCandidates(data: ArchGraphData, limit = 10): ArchitectureScene[] {
   const degree = degreeMap(data);
-
-  return data.nodes
+  const ranked = data.nodes
     .filter((node) => sceneKindWeight[node.kind] !== undefined)
     .map((node) => ({
       node,
@@ -71,9 +81,22 @@ export function deriveSceneCandidates(data: ArchGraphData, limit = 10): Architec
         + (node.health === 'error' ? 50 : node.health === 'warning' || node.health === 'impacted' ? 25 : 0)
         + (node.change === 'changed' ? 24 : node.change === 'affected' ? 12 : 0),
     }))
-    .sort((left, right) => right.score - left.score || left.node.label.localeCompare(right.node.label))
-    .slice(0, Math.max(0, limit))
-    .map(({ node }) => sceneFromNode(node));
+    .sort((left, right) => right.score - left.score || left.node.label.localeCompare(right.node.label));
+
+  const selected: ArchNode[] = [];
+  const selectedByKind = new Map<NodeKind, number>();
+  const target = Math.max(0, limit);
+
+  for (const { node } of ranked) {
+    if (selected.length >= target) break;
+    const cap = sceneKindCap[node.kind] ?? 1;
+    const used = selectedByKind.get(node.kind) ?? 0;
+    if (used >= cap) continue;
+    selected.push(node);
+    selectedByKind.set(node.kind, used + 1);
+  }
+
+  return selected.map((node) => sceneFromNode(node));
 }
 
 export function projectScene(data: ArchGraphData, scene: ArchitectureScene): ArchGraphData {
