@@ -233,10 +233,10 @@ export default function App() {
   const [recording, setRecording] = useState(false);
   const [journeyNotice, setJourneyNotice] = useState<string>();
   const playbackRunRef = useRef(0);
-  const recorderRef = useRef<MediaRecorder>();
-  const recordingStreamRef = useRef<MediaStream>();
+  const recorderRef = useRef<MediaRecorder | undefined>(undefined);
+  const recordingStreamRef = useRef<MediaStream | undefined>(undefined);
   const recordingChunksRef = useRef<Blob[]>([]);
-  const recordingFormatRef = useRef<RecordingFormat>();
+  const recordingFormatRef = useRef<RecordingFormat | undefined>(undefined);
 
   useEffect(() => {
     window.localStorage.setItem(SAVED_SCENES_KEY, JSON.stringify(savedScenes));
@@ -539,7 +539,7 @@ export default function App() {
         if (event.data.size > 0) recordingChunksRef.current.push(event.data);
       };
       recorder.onstop = () => {
-        const fallback = recordingFormatRef.current ?? { extension: 'webm' as const };
+        const fallback: RecordingFormat = recordingFormatRef.current ?? { extension: 'webm' };
         const mimeType = recorder.mimeType || fallback.mimeType || 'video/webm';
         const extension = extensionForMimeType(mimeType, fallback.extension);
         const blob = new Blob(recordingChunksRef.current, { type: mimeType });
