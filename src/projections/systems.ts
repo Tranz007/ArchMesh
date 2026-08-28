@@ -1,3 +1,4 @@
+import { withMergedFlowDirection } from '../flow';
 import type {
   ArchEdge,
   ArchGraphData,
@@ -78,15 +79,20 @@ function addAggregatedEdge(
     const previousCount = typeof existing.metadata?.evidenceCount === 'number'
       ? existing.metadata.evidenceCount
       : 1;
+    const previousMetadata = existing.metadata;
     const incomingMoreSevere = healthRank[incoming.health] >= healthRank[existing.health];
     existing.health = worstHealth(existing.health, incoming.health);
     existing.change = worstChange(existing.change ?? 'unchanged', incoming.change);
-    existing.metadata = {
-      ...(incomingMoreSevere ? existing.metadata : incoming.metadata),
-      ...(incomingMoreSevere ? incoming.metadata : existing.metadata),
+    const preferredMetadata = {
+      ...(incomingMoreSevere ? previousMetadata : incoming.metadata),
+      ...(incomingMoreSevere ? incoming.metadata : previousMetadata),
       evidenceCount: previousCount + 1,
       aggregated: true,
     };
+    existing.metadata = withMergedFlowDirection(
+      preferredMetadata,
+      incomingMoreSevere ? previousMetadata : incoming.metadata,
+    );
     if (existing.label !== incoming.label) existing.label = `${previousCount + 1} relationships`;
     return;
   }
