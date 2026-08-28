@@ -123,6 +123,23 @@
   transform: rotate(45deg);
 }
 
+.legend-dot.security-sensitive { background: #75d8bd; }
+.legend-dot.security-tls { background: #4fd1a1; }
+.legend-dot.security-unknown { background: #e5b957; }
+.legend-dot.security-risk { background: #ff5364; }
+
+.status.status-security {
+  border-color: rgba(79, 209, 161, .3);
+  color: #75d8bd;
+  background: rgba(79, 209, 161, .06);
+}
+
+.status.status-security-warning {
+  border-color: rgba(229, 185, 87, .3);
+  color: #e5c46f;
+  background: rgba(229, 185, 87, .06);
+}
+
 @media (max-width: 760px) {
   .graph-controls {
     left: 12px;
