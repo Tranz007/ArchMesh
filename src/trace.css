@@ -1,0 +1,23 @@
+.trace-action {
+  width: 100%;
+  margin-top: 16px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #4f79ae;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #1d3555, #162a46);
+  color: #edf5ff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.trace-action:hover {
+  border-color: #70a0df;
+  background: linear-gradient(180deg, #24446e, #1a3456);
+}
+
+.trace-action:focus-visible {
+  outline: 2px solid #86a8e0;
+  outline-offset: 2px;
+}
