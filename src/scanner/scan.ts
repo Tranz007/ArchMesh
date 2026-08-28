@@ -25,9 +25,10 @@ function toPosix(value: string) {
 
 function classifyFile(relativePath: string): NodeKind {
   const normalized = toPosix(relativePath);
+  const basename = path.basename(normalized);
   if (/\/app\/api\/.+\/route\.[jt]sx?$/.test(`/${normalized}`) || /(^|\/)api\/.+\.[jt]sx?$/.test(normalized)) return 'api';
   if (/\/app\/.+\/page\.[jt]sx?$/.test(`/${normalized}`) || /(^|\/)app\/page\.[jt]sx?$/.test(normalized)) return 'route';
-  if (/components?\//i.test(normalized) || /[A-Z][A-Za-z0-9_-]*\.[jt]sx$/.test(path.basename(normalized))) return 'component';
+  if (/components?\//i.test(normalized) || /\.component\.[jt]sx?$/i.test(basename) || /[A-Z][A-Za-z0-9_-]*\.[jt]sx$/.test(basename)) return 'component';
   if (/(service|client|repository|store|provider|adapter)s?\//i.test(normalized) || /(service|client|repository|adapter)\.[jt]s$/i.test(normalized)) return 'service';
   if (/(schema|model|types?)\//i.test(normalized)) return 'data';
   return 'file';
