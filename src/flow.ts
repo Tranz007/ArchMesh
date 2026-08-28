@@ -93,8 +93,19 @@ export function hasDirectionalFlowEvidence(edge: Pick<FlowEdgeLike, 'relation' |
   return isDirectionalFlowRelation(edge.relation) && flowDirectionForEdge(edge) !== 'unknown';
 }
 
+/**
+ * The force graph currently has a safe built-in particle path only in the
+ * structural source -> target direction. Reverse and bidirectional evidence is
+ * still retained and labeled, but it must not be implemented by reversing or
+ * duplicating force links. A future visual-only pulse layer can consume those
+ * directions without participating in layout.
+ */
+export function canAnimateFlowDirection(edge: Pick<FlowEdgeLike, 'relation' | 'flowDirection'>) {
+  return flowDirectionForEdge(edge) === 'source-to-target';
+}
+
 export function shouldAnimateFlowEdge(edge: FlowEdgeLike, selection: FlowSelection) {
-  if (!selection.enabled || !hasDirectionalFlowEvidence(edge)) return false;
+  if (!selection.enabled || !hasDirectionalFlowEvidence(edge) || !canAnimateFlowDirection(edge)) return false;
   if (selection.scope === 'all') return true;
   if (selection.selectedEdgeId) return edge.id === selection.selectedEdgeId;
   if (selection.selectedNodeId) {
@@ -104,16 +115,14 @@ export function shouldAnimateFlowEdge(edge: FlowEdgeLike, selection: FlowSelecti
 }
 
 /**
- * The graph renderer documents particle travel from rendered source to rendered
- * target. ArchMesh keeps evidence orientation separate from data-flow
- * orientation: reads are stored as "reader reads resource", and an integration
- * can carry explicit source/target direction evidence.
+ * Force-layout endpoints are structural evidence, never animation state. Earlier
+ * flow work swapped read endpoints here so particles could travel backwards;
+ * that coupled packet direction to the d3 topology and made a visual feature
+ * capable of destabilizing the entire scene. Keep the force link orientation
+ * immutable. Reverse/bidirectional pulses belong in a visual-only layer.
  */
 export function flowRenderEndpoints(edge: Pick<FlowEdgeLike, 'source' | 'target' | 'relation' | 'flowDirection'>) {
-  const direction = flowDirectionForEdge(edge);
-  return direction === 'target-to-source'
-    ? { source: edge.target, target: edge.source }
-    : { source: edge.source, target: edge.target };
+  return { source: edge.source, target: edge.target };
 }
 
 /**
