@@ -16,7 +16,7 @@ export function shouldRunGuidedOnboarding(
   stdinIsTTY = Boolean(process.stdin.isTTY),
   stdoutIsTTY = Boolean(process.stdout.isTTY),
 ) {
-  const requested = argv.length === 0 || argv.includes('--guided');
+  const requested = argv.length === 0 || (argv.length === 1 && argv[0] === '--guided');
   return requested && stdinIsTTY && stdoutIsTTY;
 }
 
