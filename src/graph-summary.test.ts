@@ -9,6 +9,7 @@ function fixture(): ArchGraphData {
     metadata: {
       languagePlugins: 'javascript-typescript',
       frameworkAdapters: 'nextjs',
+      systemBoundaryCount: 2,
     },
     nodes: [
       { id: 'file:page', label: 'page.tsx', kind: 'route', health: 'healthy' },
@@ -37,6 +38,7 @@ describe('graph startup summary', () => {
   it('turns plugin metadata and graph evidence into a human-readable overview', () => {
     expect(summarizeGraph(fixture())).toEqual({
       technologies: ['JavaScript / TypeScript', 'Next.js'],
+      systems: 2,
       routes: 1,
       apis: 1,
       dataStores: 1,
@@ -47,7 +49,7 @@ describe('graph startup summary', () => {
 
     expect(startupSummaryLines(fixture())).toEqual([
       'Detected: JavaScript / TypeScript + Next.js',
-      'Architecture: 1 route · 1 API · 1 data store · 2 integrations',
+      'Architecture: 2 systems · 1 route · 1 API · 1 data store · 2 integrations',
       'Integrations: Firebase, Stripe',
       'Security evidence: 1 security finding · 1 sensitive flow',
     ]);
