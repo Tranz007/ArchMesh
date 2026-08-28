@@ -1,3 +1,4 @@
+import { nextJsAdapter } from './frameworks/nextjs.js';
 import { javascriptTypeScriptPlugin } from './languages/javascript-typescript.js';
 import type { FrameworkAdapter, LanguagePlugin } from './types.js';
 
@@ -7,5 +8,4 @@ import type { FrameworkAdapter, LanguagePlugin } from './types.js';
  */
 export const builtInLanguagePlugins: LanguagePlugin[] = [javascriptTypeScriptPlugin];
 
-/** Framework adapters will migrate here as framework semantics are extracted. */
-export const builtInFrameworkAdapters: FrameworkAdapter[] = [];
+export const builtInFrameworkAdapters: FrameworkAdapter[] = [nextJsAdapter];
