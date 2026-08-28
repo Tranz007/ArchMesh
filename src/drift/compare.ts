@@ -152,6 +152,7 @@ export function compareGraphs(previous: ArchGraphData, current: ArchGraphData): 
       metadata: {
         ...(current.metadata ?? {}),
         graphKind: 'drift',
+        driftAvailable: true,
         driftAddedNodes: addedNodes,
         driftRemovedNodes: removedNodes,
         driftModifiedNodes: modifiedNodes,
