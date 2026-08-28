@@ -1,3 +1,4 @@
+import { fastApiAdapter } from './frameworks/fastapi.js';
 import { nextJsAdapter } from './frameworks/nextjs.js';
 import { javascriptTypeScriptPlugin } from './languages/javascript-typescript.js';
 import { pythonPlugin } from './languages/python.js';
@@ -12,4 +13,7 @@ export const builtInLanguagePlugins: LanguagePlugin[] = [
   pythonPlugin,
 ];
 
-export const builtInFrameworkAdapters: FrameworkAdapter[] = [nextJsAdapter];
+export const builtInFrameworkAdapters: FrameworkAdapter[] = [
+  nextJsAdapter,
+  fastApiAdapter,
+];

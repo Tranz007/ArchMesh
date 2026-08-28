@@ -29,7 +29,8 @@ A support level describes ArchMesh's evidence coverage. It does **not** mean Arc
 | **React Native / Expo** | **Structural** | TS/JS dependency graph, components, services, static `fetch()`, supported integrations | Expo Router/navigation, native modules, platform boundaries, app configuration semantics |
 | **Electron** | **Structural** | TS/JS graph across main/renderer source when inside the scanned root | IPC, preload/context bridge, process boundaries are not modeled yet |
 | **Python services / libraries** | **Structural** | `.py` source graph, absolute and relative package imports, root and `src/` layouts, module/service/data classification, selected integration imports | Dynamic imports, Python call graph, packaging/workspace semantics, framework-specific runtime meaning |
-| **FastAPI / Django / Flask** | **Structural** | Underlying Python source/import graph and generic structure | Routes, decorators, dependency injection, middleware, ORM/framework data semantics need dedicated adapters |
+| **FastAPI** | **Deep** | Python graph plus FastAPI route decorators, static methods/paths, static `APIRouter` prefixes, semantic handler nodes, selected `Depends(...)` evidence | Router inclusion across modules, dynamic route construction, middleware/security dependency semantics, request/response models |
+| **Django / Flask** | **Structural** | Underlying Python source/import graph and generic structure | Framework routes, handlers/views, middleware, ORM/framework data semantics need dedicated adapters |
 | **npm / pnpm / Yarn monorepos** | **Partial** | Supported JS/TS/Python source under the selected root is walked and merged | Workspace/package boundaries, package-to-package architecture, aliases outside the scan root |
 | **Turborepo / Nx** | **Partial** | Underlying supported source can be scanned | Workspace/project graph and task graph semantics are not imported yet |
 | **Vue / Nuxt** | **Partial** | Standalone `.ts` / `.js` source is scanned | `.vue` single-file components and Nuxt routing/server semantics are not parsed yet |
@@ -93,7 +94,22 @@ The built-in Python plugin uses a real Python syntax grammar and provides:
 - selected integration-package detection;
 - mixed-language graph merging with the JavaScript/TypeScript plugin.
 
-It deliberately does **not** infer FastAPI, Django, or Flask routes from filenames. Those semantics belong in framework adapters.
+Framework-specific meaning is layered on afterward. The FastAPI adapter currently adds semantic request-facing endpoints while Django/Flask remain structural-only.
+
+## FastAPI adapter coverage
+
+The built-in FastAPI adapter currently recognizes defensible static evidence for:
+
+- FastAPI presence from package metadata or direct source imports;
+- `FastAPI()` and `APIRouter()` bindings;
+- `get`, `post`, `put`, `patch`, `delete`, `options`, and `head` route decorators;
+- static `api_route(..., methods=[...])` method lists;
+- static `APIRouter(prefix=...)` prefixes declared in the same module;
+- source handler names;
+- conservative `Depends(...)` counts on the handler;
+- separate semantic API nodes per method/path rather than treating a whole Python file as one endpoint.
+
+Dynamic/f-string paths are intentionally omitted. Cross-module `include_router()` prefix composition is not yet claimed.
 
 ## Capabilities shared after scanning
 
@@ -128,8 +144,6 @@ Angular source graph
       └── selected RxJS/data-flow evidence
 ```
 
-A FastAPI adapter should similarly recognize route decorators, methods/paths, router inclusion, dependency injection, and request-facing handlers without putting those rules into the Python language parser.
-
 Likewise, Express support should understand registered routes and middleware; Vue support should parse SFCs; Spring support should understand controllers, services, repositories, and DI.
 
 ## Expansion priority
@@ -138,12 +152,13 @@ Breadth matters to ArchMesh. The implemented architecture is **language plugin +
 
 A practical next sequence is:
 
-1. deepen the new Python graph with a FastAPI adapter, followed by Django/Flask based on representative demand;
-2. deepen the JavaScript/TypeScript ecosystem: Angular, Express/Fastify/Hono, NestJS, React Router/Vite, Expo Router;
-3. improve workspace/system boundaries: npm/pnpm/Yarn workspaces, Nx, Turborepo, mixed-language services;
-4. add framework-native component formats: Vue/Nuxt, Svelte/SvelteKit, Astro;
-5. add additional backend language families: Java/Kotlin, C#/.NET, Go;
-6. extend into additional ecosystems based on representative repositories and contributor demand.
+1. add Angular semantic support on top of the JavaScript/TypeScript plugin;
+2. improve workspace/system boundaries for npm/pnpm/Yarn workspaces, Nx, Turborepo, and mixed-language services;
+3. add cross-language HTTP endpoint matching when a caller and handler both expose compatible static evidence;
+4. deepen Node frameworks: Express/Fastify/Hono, NestJS, React Router/Vite, Expo Router;
+5. add Django/Flask adapters and framework-native component formats such as Vue/Nuxt, Svelte/SvelteKit, Astro;
+6. add additional backend language families: Java/Kotlin, C#/.NET, Go;
+7. extend into additional ecosystems based on representative repositories and contributor demand.
 
 This ordering is not a promise of release dates. Support should be promoted only when representative fixtures and tests prove the claimed behavior.
 

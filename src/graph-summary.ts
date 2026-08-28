@@ -4,6 +4,7 @@ const DISPLAY_NAMES: Record<string, string> = {
   'javascript-typescript': 'JavaScript / TypeScript',
   python: 'Python',
   nextjs: 'Next.js',
+  fastapi: 'FastAPI',
 };
 
 function metadataList(graph: ArchGraphData, key: string) {
