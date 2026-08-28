@@ -20,6 +20,13 @@ const icon = {
   impact: GitFork,
 };
 
+const label = {
+  scene: 'Focused scene',
+  'path-select': 'Find path',
+  path: 'Detected path',
+  impact: 'Impact view',
+};
+
 export function WorkflowBar({
   kind,
   title,
@@ -38,6 +45,7 @@ export function WorkflowBar({
       <div className="workflow-context">
         <span className="workflow-icon"><Icon size={14} /></span>
         <span>
+          <em className="workflow-kicker">{label[kind]}</em>
           <strong>{title}</strong>
           <small>{detail}</small>
         </span>
