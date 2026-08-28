@@ -80,7 +80,7 @@ describe('directional flow', () => {
     expect(hasReverseFlow(read)).toBe(true);
     expect(flowEmissionDirections(read)).toEqual(['target-to-source']);
     expect(shouldAnimateFlowEdge(read, { enabled: true, scope: 'all' })).toBe(true);
-    expect(flowRenderEndpoints({ ...callEdge, relation: 'writes' as const })).toEqual({
+    expect(flowRenderEndpoints({ source: 'node:a', target: 'node:b' })).toEqual({
       source: 'node:a',
       target: 'node:b',
     });
