@@ -45,7 +45,7 @@ ArchMesh is pre-1.0 and its architecture may evolve quickly. Entries should stil
 - Internal `fetch('/api/...')` relationships.
 - External HTTP-host integrations.
 - Firestore collection discovery with read, write, and listener relationships.
-- First-class integration nodes for Firebase, Stripe, OpenAI, WorkOS, Resend, and Vercel.
+- First-class integration nodes for Firebase, Stripe, OpenAI, WorkOS, Resend, Vercel, and HTTP-host nodes.
 - Dedicated data/integration Topology projection.
 
 #### Health and failures
@@ -79,7 +79,7 @@ ArchMesh is pre-1.0 and its architecture may evolve quickly. Entries should stil
 - Viewer graph refresh through a Vite custom event without a full page reload.
 - Active graph mode preserved across refreshes.
 - Node/edge selection preserved while the selected identity still exists.
-- Graph-to-graph drift comparison between consecutive successful watch scans.
+- Graph-to-graph architecture drift between consecutive successful watch scans.
 - Independent `stable`, `added`, `removed`, and `modified` architecture states.
 - Structural comparison based on stable node identity and structural edge signatures rather than generated edge IDs.
 - Structural fingerprints ignore runtime health and Git change overlays.
@@ -104,6 +104,10 @@ ArchMesh is pre-1.0 and its architecture may evolve quickly. Entries should stil
 - Health-specific UI is hidden when the active scan has no attached health evidence.
 - Drift-specific UI is hidden until a watch session has a prior successful scan to compare.
 - Static Flow animation is explicitly illustrative directionality, not realtime traffic or health telemetry.
+- Focused Scene traversal now treats `Both` as independent inbound and outbound walks from the selected seed, preventing parent containers and shared dependencies from exploding a route Scene back into the full repository.
+- Focused Scenes are hard-bounded for dense repositories and retain metadata when the projection reaches that safety limit.
+- Route and API Scene names prefer detected route/endpoint semantics instead of ambiguous filenames such as `page.tsx` and `route.ts`.
+- The active Scene state and depth/direction controls are visually explicit and explain what changed in the graph instead of appearing as an unexplained selected card.
 - Current watch mode performs full graph rebuilds; incremental scanning is a future optimization rather than an undocumented assumption.
 
 ### Next
