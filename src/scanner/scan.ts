@@ -2,13 +2,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
 import { securityMetadataForFields } from '../security/classify.js';
+import { httpSecurityMetadata, safeHttpUrl } from '../security/http.js';
 import type { ArchEdge, ArchGraphData, ArchNode, NodeKind } from '../types.js';
 import { configuredFeatureForPath, loadArchMeshConfig } from './config.js';
-import { collectFirestoreAccesses, collectHttpCalls, type HttpCall } from './semantics.js';
+import { collectFirestoreAccesses, collectHttpCalls } from './semantics.js';
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 const IGNORED_DIRS = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'coverage', '.turbo']);
-const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']);
 
 const integrationMatchers: Array<[RegExp, string]> = [
   [/^(firebase|firebase-admin)(\/|$)/, 'Firebase'],
@@ -26,86 +26,11 @@ function toPosix(value: string) {
 function classifyFile(relativePath: string): NodeKind {
   const normalized = toPosix(relativePath);
   const basename = path.basename(normalized);
-  if (/\/app\/api\/.+\/route\.[jt]sx?$/.test(`/${normalized}`) || /(^|\/)api\/.+\.[jt]sx?$/.test(normalized)) return 'api';
-  if (/\/app\/.+\/page\.[jt]sx?$/.test(`/${normalized}`) || /(^|\/)app\/page\.[jt]sx?$/.test(normalized)) return 'route';
+  if (/(^|\/)api\/.+\.[jt]sx?$/.test(normalized)) return 'api';
   if (/components?\//i.test(normalized) || /\.component\.[jt]sx?$/i.test(basename) || /[A-Z][A-Za-z0-9_-]*\.[jt]sx$/.test(basename)) return 'component';
   if (/(service|client|repository|store|provider|adapter)s?\//i.test(normalized) || /(service|client|repository|adapter)\.[jt]s$/i.test(normalized)) return 'service';
   if (/(schema|model|types?)\//i.test(normalized)) return 'data';
   return 'file';
-}
-
-function appRoutePath(relativePath: string, kind: NodeKind) {
-  if (kind !== 'route' && kind !== 'api') return undefined;
-  const parts = toPosix(relativePath).split('/').filter(Boolean);
-  const appIndex = parts.indexOf('app');
-  if (appIndex < 0) return undefined;
-
-  const routeParts = parts.slice(appIndex + 1, -1).filter((segment) => {
-    if (segment.startsWith('(') && segment.endsWith(')')) return false;
-    if (segment.startsWith('@')) return false;
-    return true;
-  });
-
-  const route = `/${routeParts.join('/')}`.replace(/\/+/g, '/');
-  return route === '' ? '/' : route;
-}
-
-function isExported(node: ts.Node) {
-  return ts.canHaveModifiers(node)
-    && Boolean(ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
-}
-
-function exportedHttpMethods(sourceFile: ts.SourceFile) {
-  const methods = new Set<string>();
-
-  for (const statement of sourceFile.statements) {
-    if (ts.isFunctionDeclaration(statement) && isExported(statement) && statement.name) {
-      if (HTTP_METHODS.has(statement.name.text)) methods.add(statement.name.text);
-    }
-    if (ts.isVariableStatement(statement) && isExported(statement)) {
-      for (const declaration of statement.declarationList.declarations) {
-        if (ts.isIdentifier(declaration.name) && HTTP_METHODS.has(declaration.name.text)) {
-          methods.add(declaration.name.text);
-        }
-      }
-    }
-  }
-
-  return [...methods].sort();
-}
-
-function hasDirective(statements: ts.NodeArray<ts.Statement>, directive: string) {
-  return statements.some(
-    (statement) => ts.isExpressionStatement(statement)
-      && ts.isStringLiteral(statement.expression)
-      && statement.expression.text === directive,
-  );
-}
-
-function functionBlock(node: ts.Node): ts.Block | undefined {
-  if (ts.isFunctionDeclaration(node)
-    || ts.isFunctionExpression(node)
-    || ts.isArrowFunction(node)
-    || ts.isMethodDeclaration(node)
-    || ts.isGetAccessorDeclaration(node)
-    || ts.isSetAccessorDeclaration(node)
-    || ts.isConstructorDeclaration(node)) {
-    return node.body && ts.isBlock(node.body) ? node.body : undefined;
-  }
-  return undefined;
-}
-
-function serverActionCount(sourceFile: ts.SourceFile) {
-  let count = hasDirective(sourceFile.statements, 'use server') ? 1 : 0;
-
-  const visit = (node: ts.Node) => {
-    const body = functionBlock(node);
-    if (body && hasDirective(body.statements, 'use server')) count += 1;
-    ts.forEachChild(node, visit);
-  };
-
-  ts.forEachChild(sourceFile, visit);
-  return count;
 }
 
 async function walk(dir: string, files: string[]) {
@@ -224,52 +149,8 @@ function scriptKindFor(file: string) {
   return ts.ScriptKind.TS;
 }
 
-function safeHttpUrl(url: string) {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
-    return parsed;
-  } catch {
-    return undefined;
-  }
-}
-
 function resourceId(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
-}
-
-function httpSecurityMetadata(call: HttpCall) {
-  const sensitive = securityMetadataForFields(call.bodyFields);
-  const parsed = safeHttpUrl(call.url);
-
-  if (!parsed) {
-    return {
-      ...sensitive,
-      securityBoundary: 'same-origin',
-      securityTransport: 'unknown',
-      securityTransportEvidence: 'Relative URL: transport inherits the deployment origin and cannot be proven from source alone.',
-    };
-  }
-
-  const cleartext = parsed.protocol === 'http:';
-  const sensitiveData = sensitive.securitySensitiveData === true;
-  return {
-    ...sensitive,
-    securityBoundary: 'external',
-    securityExternalBoundary: true,
-    securityTransport: cleartext ? 'cleartext' : 'tls-requested',
-    securityTransportEvidence: cleartext
-      ? 'Static URL uses http://.'
-      : 'Static URL uses https://; TLS is requested, but certificate/runtime configuration is not verified by this scan.',
-    ...(cleartext
-      ? {
-          securityFinding: sensitiveData ? 'sensitive-data-over-cleartext' : 'cleartext-transport',
-          securitySeverity: sensitiveData ? 'high' : 'warning',
-        }
-      : sensitiveData
-        ? { securityFinding: 'sensitive-data-crosses-external-boundary', securitySeverity: 'info' }
-        : {}),
-  };
 }
 
 export async function scanProject(rootInput: string): Promise<ArchGraphData> {
@@ -296,37 +177,20 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
     const id = nodeIdForFile(relative);
     const configuredFeature = configuredFeatureForPath(relative, archMeshConfig);
     const kind = classifyFile(relative);
-    const routePath = appRoutePath(relative, kind);
     nodes.set(id, {
       id,
       label: path.basename(relative),
       kind,
       path: relative,
       health: 'healthy',
-      metadata: {
-        ...(configuredFeature
-          ? {
-              featureKey: configuredFeature.key,
-              featureLabel: configuredFeature.label ?? null,
-              featureSource: 'config',
-            }
-          : {}),
-        ...(routePath
-          ? {
-              framework: 'nextjs',
-              routePath,
-              routeType: kind === 'api' ? 'api' : 'page',
-            }
-          : {}),
-      },
+      metadata: configuredFeature
+        ? {
+            featureKey: configuredFeature.key,
+            featureLabel: configuredFeature.label ?? null,
+            featureSource: 'config',
+          }
+        : undefined,
     });
-  }
-
-  const apiRouteByPath = new Map<string, string>();
-  for (const node of nodes.values()) {
-    if (node.kind !== 'api') continue;
-    const routePath = node.metadata?.routePath;
-    if (typeof routePath === 'string') apiRouteByPath.set(routePath, node.id);
   }
 
   for (const absolute of files) {
@@ -340,20 +204,7 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
       true,
       scriptKindFor(absolute),
     );
-    const node = nodes.get(sourceId);
     const imports = collectImports(sourceFile);
-
-    if (node) {
-      const methods = node.kind === 'api' ? exportedHttpMethods(sourceFile) : [];
-      const actions = serverActionCount(sourceFile);
-      if (methods.length > 0 || actions > 0) {
-        node.metadata = {
-          ...(node.metadata ?? {}),
-          ...(methods.length > 0 ? { httpMethods: methods.join(', ') } : {}),
-          ...(actions > 0 ? { serverActionCount: actions } : {}),
-        };
-      }
-    }
 
     for (const specifier of imports) {
       let targetId: string | undefined;
@@ -385,24 +236,11 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
     }
 
     for (const call of collectHttpCalls(sourceFile)) {
-      const localPath = call.url.startsWith('/') ? call.url.split('?')[0] : undefined;
-      const localApiId = localPath ? apiRouteByPath.get(localPath) : undefined;
-      const securityMetadata = httpSecurityMetadata(call);
-
-      if (localApiId) {
-        addEdge({
-          source: sourceId,
-          target: localApiId,
-          relation: 'calls',
-          health: 'healthy',
-          label: `${call.method} ${localPath}`,
-          metadata: securityMetadata,
-        });
-        continue;
-      }
-
+      // Relative URLs depend on framework/deployment semantics. The language
+      // parser deliberately leaves them to compatible framework adapters.
       const parsed = safeHttpUrl(call.url);
       if (!parsed) continue;
+
       const integrationId = `integration:http:${resourceId(parsed.host)}`;
       if (!nodes.has(integrationId)) {
         nodes.set(integrationId, {
@@ -419,7 +257,7 @@ export async function scanProject(rootInput: string): Promise<ArchGraphData> {
         relation: 'calls',
         health: 'healthy',
         label: `${call.method} ${call.url}`,
-        metadata: securityMetadata,
+        metadata: httpSecurityMetadata(call),
       });
     }
 

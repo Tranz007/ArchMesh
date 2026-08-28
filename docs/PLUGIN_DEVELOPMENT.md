@@ -42,6 +42,8 @@ Examples:
 
 Adapters add meaning without replacing the source graph.
 
+The built-in `nextjs` adapter in `src/plugins/frameworks/nextjs.ts` is the first production reference implementation. It demonstrates conservative framework detection, enrichment of existing source nodes, framework-owned call edges, and capability declarations without coupling the viewer to Next.js.
+
 ## Language plugin contract
 
 The current TypeScript contract is in `src/plugins/types.ts`.
@@ -226,7 +228,7 @@ A support-matrix status must not be promoted until those fixtures or representat
 
 1. Plugin host and merge contract — **implemented**.
 2. Existing JavaScript/TypeScript scanner registered as first built-in language plugin — **implemented**.
-3. Extract current Next.js-specific behavior into a Next.js framework adapter without changing output.
+3. Next.js-specific route/API/server-action semantics extracted into the first production framework adapter — **implemented**.
 4. Add deeper Angular / Node-framework adapters.
 5. Add the first non-JavaScript language plugin.
 6. Finalize explicit external plugin discovery/loading only after the internal API has survived real parser additions.

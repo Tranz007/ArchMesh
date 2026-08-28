@@ -23,8 +23,8 @@ async function fixture(files: Record<string, string>) {
   return root;
 }
 
-describe('scanProject', () => {
-  it('maps relative imports and known integrations', async () => {
+describe('scanProject JavaScript/TypeScript structural parser', () => {
+  it('maps relative imports and known integrations without inventing framework semantics', async () => {
     const root = await fixture({
       'src/app/page.tsx': `import { Card } from '../components/Card';\nimport Stripe from 'stripe';\nexport default function Page(){ return <Card /> }`,
       'src/components/Card.tsx': `export function Card(){ return <div>Card</div> }`,
@@ -36,8 +36,9 @@ describe('scanProject', () => {
     const card = graph.nodes.find((node) => node.path === 'src/components/Card.tsx');
     const stripe = graph.nodes.find((node) => node.id === 'integration:stripe');
 
-    expect(page?.kind).toBe('route');
-    expect(page?.metadata?.routePath).toBe('/');
+    expect(page?.kind).toBe('file');
+    expect(page?.metadata?.framework).toBeUndefined();
+    expect(page?.metadata?.routePath).toBeUndefined();
     expect(card?.kind).toBe('component');
     expect(stripe?.kind).toBe('integration');
     expect(graph.edges).toEqual(
@@ -73,49 +74,15 @@ describe('scanProject', () => {
     );
   });
 
-  it('detects Next.js page and API route semantics', async () => {
+  it('does not map relative framework URLs without a framework adapter', async () => {
     const root = await fixture({
-      'src/app/(main)/orders/[id]/page.tsx': `export default function Order(){ return null }`,
-      'src/app/api/orders/[id]/route.ts': `export async function GET(){ return new Response('ok') }\nexport const POST = async () => new Response('created')`,
+      'src/client.ts': `export async function publish(){ return fetch('/api/catalog/publish', { method: 'POST' }) }`,
+      'src/api/catalog/publish.ts': `export async function publish(){ return true }`,
     });
 
     const graph = await scanProject(root);
-    const page = graph.nodes.find((node) => node.path?.endsWith('/page.tsx'));
-    const api = graph.nodes.find((node) => node.path?.endsWith('/route.ts'));
 
-    expect(page?.metadata).toMatchObject({
-      framework: 'nextjs',
-      routePath: '/orders/[id]',
-      routeType: 'page',
-    });
-    expect(api?.metadata).toMatchObject({
-      framework: 'nextjs',
-      routePath: '/api/orders/[id]',
-      routeType: 'api',
-      httpMethods: 'GET, POST',
-    });
-  });
-
-  it('maps static internal fetch calls to API routes', async () => {
-    const root = await fixture({
-      'src/app/catalog/page.tsx': `export async function publish(){ return fetch('/api/catalog/publish', { method: 'POST' }) }`,
-      'src/app/api/catalog/publish/route.ts': `export async function POST(){ return new Response('ok') }`,
-    });
-
-    const graph = await scanProject(root);
-    const page = graph.nodes.find((node) => node.path === 'src/app/catalog/page.tsx');
-    const api = graph.nodes.find((node) => node.path === 'src/app/api/catalog/publish/route.ts');
-
-    expect(graph.edges).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          source: page?.id,
-          target: api?.id,
-          relation: 'calls',
-          label: 'POST /api/catalog/publish',
-        }),
-      ]),
-    );
+    expect(graph.edges.some((edge) => edge.relation === 'calls')).toBe(false);
   });
 
   it('maps external fetch calls to HTTP integration nodes', async () => {
@@ -196,18 +163,15 @@ describe('scanProject', () => {
     );
   });
 
-  it('detects server action directives', async () => {
+  it('does not interpret server-action directives without a framework adapter', async () => {
     const root = await fixture({
-      'src/app/catalog/actions.ts': `'use server';\nexport async function publish(){ return true }`,
-      'src/app/orders/actions.ts': `export async function save(){ 'use server'; return true }`,
+      'src/actions.ts': `'use server';\nexport async function publish(){ return true }`,
     });
 
     const graph = await scanProject(root);
-    const catalog = graph.nodes.find((node) => node.path === 'src/app/catalog/actions.ts');
-    const orders = graph.nodes.find((node) => node.path === 'src/app/orders/actions.ts');
+    const actions = graph.nodes.find((node) => node.path === 'src/actions.ts');
 
-    expect(catalog?.metadata?.serverActionCount).toBe(1);
-    expect(orders?.metadata?.serverActionCount).toBe(1);
+    expect(actions?.metadata?.serverActionCount).toBeUndefined();
   });
 
   it('ignores generated and dependency directories', async () => {
