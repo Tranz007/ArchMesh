@@ -30,44 +30,7 @@ jobs:
           cache-dependency-path: package.json
 
       - name: Apply viewport-fit race fix
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('src/GraphCanvas.tsx')
-          text = path.read_text()
-          marker = 'The force engine can finish while the canvas is still at its initial 1×1'
-          if marker in text:
-              raise SystemExit(0)
-
-          start = text.index('  const fitGraph = () => {')
-          end = text.index('  const toggleFlow = () => {', start)
-          new = '''  const fitGraph = () => {
-            const graph = graphRef.current;
-            if (!graph || graphData.nodes.length === 0 || size.width < 120 || size.height < 120) return false;
-            graph.zoomToFit(450, 72);
-            fittedGraphRef.current = graphIdentity;
-            return true;
-          };
-
-          useEffect(() => {
-            if (graphData.nodes.length === 0 || size.width < 120 || size.height < 120) return undefined;
-            if (fittedGraphRef.current === graphIdentity) return undefined;
-
-            // The force engine can finish while the canvas is still at its initial 1×1
-            // measurement. Fit only after ResizeObserver has reported a real viewport;
-            // otherwise a failed early fit can leave the camera effectively miles away.
-            const timer = window.setTimeout(() => {
-              if (fittedGraphRef.current !== graphIdentity) fitGraph();
-            }, 120);
-
-            return () => window.clearTimeout(timer);
-          }, [graphData.nodes.length, graphIdentity, size.height, size.width]);
-
-'''
-          path.write_text(text[:start] + new + text[end:])
-          PY
+        run: node scripts/patch-fit-race.mjs
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
@@ -94,7 +57,6 @@ jobs:
         run: npm run scan -- .
 
       - name: Headless viewer render
-        id: viewer
         shell: bash
         run: |
           set -euo pipefail
@@ -138,9 +100,7 @@ jobs:
           chrome_status=$?
           set -e
 
-          echo "--- ArchMesh server ---"
           cat /tmp/archmesh-viewer.log
-          echo "--- Chrome ---"
           cat /tmp/chrome-viewer.log
           echo "Chrome status: $chrome_status"
           test -s /tmp/archmesh-viewer.png
