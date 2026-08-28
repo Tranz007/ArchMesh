@@ -74,7 +74,7 @@ describe('directional flow', () => {
     });
   });
 
-  it('keeps bidirectional integration evidence explicit and mergeable', () => {
+  it('keeps bidirectional integration evidence explicit without materializing a second force link', () => {
     expect(mergeFlowDirection('source-to-target', 'target-to-source')).toBe('both');
     expect(withMergedFlowDirection(
       { flowDirection: 'source-to-target', securityTransport: 'unknown' },
@@ -89,7 +89,7 @@ describe('directional flow', () => {
       relation: 'integrates-with' as const,
       flowDirection: 'both' as const,
     };
-    expect(hasReverseFlow(integration)).toBe(true);
+    expect(hasReverseFlow(integration)).toBe(false);
     expect(flowDirectionLabel('integrates-with', 'both')).toBe('source ↔ target');
   });
 

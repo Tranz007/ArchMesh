@@ -116,8 +116,14 @@ export function flowRenderEndpoints(edge: Pick<FlowEdgeLike, 'source' | 'target'
     : { source: edge.source, target: edge.target };
 }
 
-export function hasReverseFlow(edge: Pick<FlowEdgeLike, 'relation' | 'flowDirection'>) {
-  return flowDirectionForEdge(edge) === 'both';
+/**
+ * Bidirectional evidence remains part of the graph model, but the renderer must
+ * not materialize a second hidden force-graph link merely to animate it. That
+ * approach can destabilize the scene even when Flow is off. A safer visual-only
+ * reverse pulse mechanism will consume the same `both` evidence separately.
+ */
+export function hasReverseFlow(_edge: Pick<FlowEdgeLike, 'relation' | 'flowDirection'>) {
+  return false;
 }
 
 export function flowParticleSpeed(relation: ArchEdge['relation']) {
