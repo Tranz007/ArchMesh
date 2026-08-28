@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { applySystemBoundaries } from '../system/boundaries.js';
 import { mergeGraphContributions, mergeLanguageGraphs } from './merge.js';
 import { builtInFrameworkAdapters, builtInLanguagePlugins } from './registry.js';
 import {
@@ -77,5 +78,8 @@ export async function scanProjectWithPlugins(
     frameworkCapabilities: capabilitiesOf(appliedFrameworkAdapters).join(', '),
   };
 
-  return graph;
+  // System/workspace boundaries are deliberately applied after language and
+  // framework enrichment so semantic route/API nodes inherit the same source
+  // path and can participate in the same app/service boundary as their file.
+  return applySystemBoundaries(root, graph);
 }
