@@ -66,7 +66,7 @@ jobs:
 
           ready=0
           for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:4242/ >/dev/null 2>&1; then
+            if curl -fsS http://localhost:4242/ >/dev/null 2>&1; then
               ready=1
               break
             fi
@@ -93,7 +93,7 @@ jobs:
             --window-size=1728,950 \
             --virtual-time-budget=10000 \
             --screenshot=/tmp/archmesh-viewer.png \
-            http://127.0.0.1:4242/ \
+            http://localhost:4242/ \
             2> /tmp/chrome-viewer.log
           chrome_status=$?
           set -e
