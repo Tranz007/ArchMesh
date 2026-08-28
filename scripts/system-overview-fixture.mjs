@@ -1,157 +1,11 @@
 import fs from 'node:fs/promises';
 
-const featureEdges = [
-  [0, 7],
-  [1, 7],
-  [6, 7],
-  [7, 25],
-  [0, 25],
-  [0, 4],
-  [1, 6],
-  [1, 0],
-  [1, 25],
-  [8, 7],
-  [2, 7],
-  [2, 6],
-  [9, 7],
-  [9, 0],
-  [10, 7],
-  [10, 25],
-  [11, 7],
-  [12, 7],
-  [3, 7],
-  [13, 7],
-  [14, 7],
-  [15, 7],
-  [16, 7],
-  [17, 7],
-  [18, 7],
-  [18, 6],
-  [19, 7],
-  [20, 7],
-  [20, 25],
-  [4, 25],
-  [4, 7],
-  [4, 0],
-  [21, 7],
-  [5, 7],
-  [2, 0],
-  [22, 7],
-  [22, 6],
-  [10, 6],
-  [10, 0],
-  [24, 20],
-  [24, 6],
-  [24, 7],
-  [24, 25],
-  [23, 7],
-  [23, 25],
-  [23, 6],
-  [25, 7],
-  [8, 25],
-  [8, 0],
-  [8, 6],
-  [7, 6],
-  [7, 0],
-  [6, 0],
-  [25, 0],
-  [21, 25],
-  [21, 6],
-  [21, 0],
-  [5, 25],
-  [5, 6],
-  [5, 0],
-  [3, 25],
-  [3, 6],
-  [3, 0],
-  [11, 25],
-  [11, 6],
-  [11, 0],
-  [12, 25],
-  [12, 6],
-  [12, 0],
-  [13, 25],
-  [13, 6],
-  [13, 0],
-  [14, 25],
-  [14, 6],
-  [14, 0],
-  [15, 25],
-  [15, 6],
-  [15, 0],
-  [16, 25],
-  [16, 6],
-  [16, 0],
-  [17, 25],
-  [17, 6],
-  [17, 0],
-  [19, 25],
-  [19, 6],
-  [19, 0],
-  [20, 6],
-  [20, 0]
-];
-
-const integrationEdges = [
-  [6, 0],
-  [0, 0],
-  [7, 0],
-  [1, 0, "target-to-source"],
-  [1, 1],
-  [1, 2],
-  [8, 0],
-  [2, 0],
-  [2, 3],
-  [2, 4],
-  [9, 0],
-  [10, 0],
-  [10, 1],
-  [11, 0],
-  [12, 0],
-  [3, 0],
-  [13, 0],
-  [14, 0],
-  [15, 0],
-  [16, 0],
-  [17, 0],
-  [17, 1],
-  [18, 0],
-  [18, 5],
-  [18, 6],
-  [19, 0],
-  [20, 0],
-  [4, 0],
-  [4, 1],
-  [4, 2],
-  [4, 7],
-  [4, 8],
-  [4, 9],
-  [21, 0],
-  [21, 1],
-  [21, 2],
-  [21, 3],
-  [21, 4],
-  [21, 5],
-  [21, 6],
-  [21, 7],
-  [21, 8],
-  [21, 9],
-  [21, 10],
-  [21, 11],
-  [5, 0],
-  [22, 0],
-  [22, 1],
-  [24, 0],
-  [23, 0],
-  [25, 0, "target-to-source"],
-  [25, 1],
-  [25, 2]
-];
-
+const featureCount = 26;
+const integrationCount = 12;
 const nodes = [];
 const edges = [];
 
-for (let index = 0; index < 26; index += 1) {
+for (let index = 0; index < featureCount; index += 1) {
   nodes.push({
     id: `file:area-${index}.ts`,
     label: `Area ${index}`,
@@ -162,7 +16,7 @@ for (let index = 0; index < 26; index += 1) {
   });
 }
 
-for (let index = 0; index < 12; index += 1) {
+for (let index = 0; index < integrationCount; index += 1) {
   nodes.push({
     id: `integration:provider-${index}`,
     label: `Provider ${index}`,
@@ -173,27 +27,35 @@ for (let index = 0; index < 12; index += 1) {
 }
 
 let edgeNumber = 1;
-for (const [source, target] of featureEdges) {
-  edges.push({
-    id: `edge:${edgeNumber++}`,
-    source: `file:area-${source}.ts`,
-    target: `file:area-${target}.ts`,
-    relation: 'imports',
-    health: 'healthy',
-    change: 'unchanged',
-  });
+
+// Deliberately dense but generic feature topology. This is synthetic CI data,
+// not modeled after any real repository.
+for (let index = 0; index < featureCount; index += 1) {
+  for (const offset of [1, 4, 7]) {
+    edges.push({
+      id: `edge:${edgeNumber++}`,
+      source: `file:area-${index}.ts`,
+      target: `file:area-${(index + offset) % featureCount}.ts`,
+      relation: 'imports',
+      health: 'healthy',
+      change: 'unchanged',
+    });
+  }
 }
 
-for (const [source, target, flowDirection] of integrationEdges) {
-  edges.push({
-    id: `edge:${edgeNumber++}`,
-    source: `file:area-${source}.ts`,
-    target: `integration:provider-${target}`,
-    relation: 'integrates-with',
-    health: 'healthy',
-    change: 'unchanged',
-    ...(flowDirection ? { metadata: { flowDirection } } : {}),
-  });
+for (let index = 0; index < featureCount; index += 1) {
+  for (const providerOffset of [0, 5]) {
+    const provider = (index + providerOffset) % integrationCount;
+    edges.push({
+      id: `edge:${edgeNumber++}`,
+      source: `file:area-${index}.ts`,
+      target: `integration:provider-${provider}`,
+      relation: 'integrates-with',
+      health: 'healthy',
+      change: 'unchanged',
+      ...(index === 3 && providerOffset === 0 ? { metadata: { flowDirection: 'target-to-source' } } : {}),
+    });
+  }
 }
 
 const graph = {
