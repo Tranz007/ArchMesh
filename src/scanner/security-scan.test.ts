@@ -97,4 +97,24 @@ describe('scanProject security evidence', () => {
       securityBoundary: 'managed-service',
     });
   });
+
+  it('does not copy URL credentials, query values, or fragments into graph artifacts', async () => {
+    const root = await fixture({
+      'src/services/partner.ts': `
+        export async function send() {
+          return fetch('https://user:supersecret@partner.example.com/profile?token=abc123&email=person@example.com#private')
+        }
+      `,
+    });
+
+    const graph = await scanProject(root);
+    const serialized = JSON.stringify(graph);
+    const edge = graph.edges.find((item) => item.label?.includes('partner.example.com'));
+
+    expect(edge?.label).toBe('GET https://partner.example.com/profile');
+    expect(serialized).not.toContain('supersecret');
+    expect(serialized).not.toContain('abc123');
+    expect(serialized).not.toContain('person@example.com');
+    expect(serialized).not.toContain('#private');
+  });
 });
