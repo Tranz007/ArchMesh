@@ -55,3 +55,9 @@ ArchMesh v0.1 is considered done when it is a trustworthy, installable, local de
 Cloud collaboration, production telemetry backends, LLM chat, MCP, cross-repository architecture, desktop packaging, and broad language support are explicitly post-v0.1 unless user evidence shows they are required for the core promise.
 
 Reason: prevent an expanding roadmap from delaying a coherent first release indefinitely. The detailed release gates live in `docs/DEFINITION_OF_DONE.md`.
+
+## 2026-08-28 — Viewport resize preserves the 3D camera
+
+After the initial graph framing, resizing the browser or graph container updates the rendering viewport without automatically invoking `Fit graph`. Automatic fitting is reserved for a new graph identity or the initial viewport-fit fallback; users can explicitly reframe with the `Fit graph` control.
+
+Reason: resizing the viewport should not overwrite orbit, pan, or zoom state or destroy the user's spatial context while inspecting a selected entity.
