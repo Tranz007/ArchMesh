@@ -442,7 +442,7 @@ export function GraphCanvas({
           const selected = typedNode.id === selectedNodeId;
           const edgeEndpoint = selection.edgeEndpoints?.has(typedNode.id) ?? false;
           const radius = kindRadius[typedNode.kind] ?? kindRadius.unknown;
-          const scale = selected ? 1.32 : edgeEndpoint ? 1.18 : 1;
+          const scale = selected ? 1.28 : edgeEndpoint ? 1.15 : 1;
           group.scale.setScalar(scale);
 
           const material = new MeshStandardMaterial({
@@ -481,7 +481,7 @@ export function GraphCanvas({
           if (showLabel) {
             const sprite = new SpriteText(
               typedNode.label,
-              selected ? 4.8 : edgeEndpoint ? 4.2 : typedNode.kind === 'product' ? 4.1 : 3.25,
+              selected ? 4.1 : edgeEndpoint ? 3.7 : typedNode.kind === 'product' ? 3.7 : 3.05,
               selected ? '#ffffff' : '#dbe6f8',
             );
             sprite.backgroundColor = 'rgba(9, 13, 23, 0.80)';
@@ -505,9 +505,9 @@ export function GraphCanvas({
         linkOpacity={0.55}
         linkWidth={(link) => {
           const typedLink = link as RenderLink;
-          if (typedLink.id === selectedEdgeId) return 3.4;
-          if (isLinkFaded(typedLink)) return 0.12;
-          if (isFlowLinkActive(typedLink)) return flowScope === 'focus' ? 1.35 : 0.82;
+          if (typedLink.id === selectedEdgeId) return isFlowLinkActive(typedLink) ? 1.6 : 2.4;
+          if (isLinkFaded(typedLink)) return 0.1;
+          if (isFlowLinkActive(typedLink)) return flowScope === 'focus' ? 0.72 : 0.48;
           if (visualMode === 'drift') {
             return typedLink.drift === 'stable' ? 0.25 : typedLink.drift === 'modified' ? 1.8 : 1.25;
           }
@@ -527,8 +527,8 @@ export function GraphCanvas({
         linkDirectionalArrowLength={(link) => {
           const typedLink = link as RenderLink;
           if (isLinkFaded(typedLink)) return 0;
-          if (typedLink.id === selectedEdgeId) return 4;
-          if (isFlowLinkActive(typedLink)) return flowScope === 'focus' ? 3.1 : 1.7;
+          if (typedLink.id === selectedEdgeId) return isFlowLinkActive(typedLink) ? 2 : 3;
+          if (isFlowLinkActive(typedLink)) return flowScope === 'focus' ? 1.45 : 0.9;
           if (typedLink.health === 'error' || typedLink.health === 'impacted') return 2.3;
           return 0;
         }}
@@ -544,8 +544,8 @@ export function GraphCanvas({
         linkDirectionalParticleWidth={(link) => {
           const typedLink = link as RenderLink;
           if (!isFlowLinkActive(typedLink)) return 0;
-          if (typedLink.id === selectedEdgeId) return 3;
-          return flowScope === 'focus' ? 2.25 : 1.45;
+          if (typedLink.id === selectedEdgeId) return 1.15;
+          return flowScope === 'focus' ? 0.82 : 0.58;
         }}
         linkDirectionalParticleSpeed={(link) => flowParticleSpeed((link as RenderLink).relation)}
         linkDirectionalParticleColor={(link) => flowColor(link as RenderLink)}
@@ -607,8 +607,8 @@ export function GraphCanvas({
         <span aria-hidden="true">
           {flowEnabled
             ? flowScope === 'focus'
-              ? 'Pulses follow selected source → target flow'
-              : 'Pulses follow visible source → target flow'
+              ? 'Pulses follow detected data direction around the selection'
+              : 'Pulses follow detected data direction; reads travel back to the reader'
             : 'Drag to orbit · Scroll to zoom · Right-drag to pan'}
         </span>
       </div>
