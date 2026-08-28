@@ -1,42 +1,23 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-function shouldScheduleViewportRefit(
-  previous: { width: number; height: number },
-  current: { width: number; height: number },
-  hasGraph: boolean,
-  isCurrentGraphFitted: boolean,
-) {
-  if (!hasGraph || current.width < 120 || current.height < 120) return false;
-  if (previous.width < 120 || previous.height < 120) return false;
-  if (previous.width === current.width && previous.height === current.height) return false;
-  return isCurrentGraphFitted;
-}
+const graphCanvasSource = readFileSync(new URL('./GraphCanvas.tsx', import.meta.url), 'utf8');
 
 describe('viewport resize camera policy', () => {
-  it('refits an already-framed graph after a real viewport resize', () => {
-    expect(shouldScheduleViewportRefit(
-      { width: 1200, height: 760 },
-      { width: 920, height: 760 },
-      true,
-      true,
-    )).toBe(true);
+  it('keeps automatic zoom-to-fit out of the resize path', () => {
+    expect(graphCanvasSource.match(/\.zoomToFit\(/g) ?? []).toHaveLength(1);
+    expect(graphCanvasSource).not.toContain('previousViewportRef');
   });
 
-  it('does not treat the initial 1px measurement as a user resize', () => {
-    expect(shouldScheduleViewportRefit(
-      { width: 1, height: 1 },
-      { width: 1200, height: 760 },
-      true,
-      false,
-    )).toBe(false);
+  it('does not refit an already framed graph when the force engine stops again', () => {
+    expect(graphCanvasSource).toContain(
+      'if (fittedGraphRef.current !== graphIdentity) fitGraph();',
+    );
   });
 
-  it('does not refit before the current graph has received its initial framing', () => {
-    expect(shouldScheduleViewportRefit(
-      { width: 1200, height: 760 },
-      { width: 1000, height: 760 },
-      true,
-      false,
-    )).toBe(false);
+  it('still waits for a real viewport before the initial graph fit', () => {
+    expect(graphCanvasSource).toContain(
+      'size.width < 120 || size.height < 120',
+    );
   });
 });
