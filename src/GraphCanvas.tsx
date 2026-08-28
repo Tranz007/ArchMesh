@@ -61,6 +61,7 @@ const flowRelationColor: Partial<Record<ArchEdge['relation'], string>> = {
 
 export const semanticKindColor: Record<string, string> = {
   product: '#d6e2f5',
+  system: '#8aa2d3',
   feature: '#6f95d8',
   integration: '#a178d0',
   api: '#53a8c7',
@@ -75,6 +76,7 @@ export const semanticKindColor: Record<string, string> = {
 
 const kindValue: Record<string, number> = {
   product: 20,
+  system: 14,
   feature: 10,
   integration: 8,
   api: 6,
@@ -89,6 +91,7 @@ const kindValue: Record<string, number> = {
 
 const kindRadius: Record<string, number> = {
   product: 6.2,
+  system: 5.1,
   feature: 4.2,
   integration: 4.1,
   api: 3.7,
@@ -103,6 +106,7 @@ const kindRadius: Record<string, number> = {
 
 const shellRadius: Record<string, number> = {
   product: 0,
+  system: 48,
   feature: 70,
   api: 104,
   service: 108,
@@ -117,6 +121,7 @@ const shellRadius: Record<string, number> = {
 
 const alwaysLabelKinds = new Set([
   'product',
+  'system',
   'feature',
   'integration',
   'api',
@@ -225,6 +230,8 @@ function geometryForKind(kind: string, radius: number): BufferGeometry {
   switch (kind) {
     case 'product':
       return new IcosahedronGeometry(radius, 1);
+    case 'system':
+      return new BoxGeometry(radius * 1.55, radius * 1.12, radius * 1.55);
     case 'feature':
       return new SphereGeometry(radius, 20, 14);
     case 'integration':
@@ -477,7 +484,11 @@ export function GraphCanvas({
           const material = new MeshStandardMaterial({
             color: faded ? '#273147' : typedNode.baseColor,
             roughness: 0.5,
-            metalness: typedNode.kind === 'integration' || typedNode.kind === 'product' ? 0.28 : 0.12,
+            metalness: typedNode.kind === 'integration' || typedNode.kind === 'product'
+              ? 0.28
+              : typedNode.kind === 'system'
+                ? 0.2
+                : 0.12,
             transparent: faded,
             opacity: faded ? 0.22 : 0.96,
             emissive: typedNode.health === 'error' || typedNode.health === 'warning' || typedNode.health === 'impacted'
@@ -508,16 +519,25 @@ export function GraphCanvas({
 
           const showLabel = !faded && (selected || edgeEndpoint || alwaysLabelKinds.has(typedNode.kind));
           if (showLabel) {
+            const labelSize = selected
+              ? 4.1
+              : edgeEndpoint
+                ? 3.7
+                : typedNode.kind === 'product'
+                  ? 3.7
+                  : typedNode.kind === 'system'
+                    ? 3.4
+                    : 3.05;
             const sprite = new SpriteText(
               typedNode.label,
-              selected ? 4.1 : edgeEndpoint ? 3.7 : typedNode.kind === 'product' ? 3.7 : 3.05,
+              labelSize,
               selected ? '#ffffff' : '#dbe6f8',
             );
             sprite.backgroundColor = 'rgba(9, 13, 23, 0.80)';
             sprite.padding = [3, 2];
             sprite.borderRadius = 4;
             sprite.fontFace = 'Inter, Arial, sans-serif';
-            sprite.fontWeight = selected || typedNode.kind === 'product' ? '700' : '500';
+            sprite.fontWeight = selected || typedNode.kind === 'product' || typedNode.kind === 'system' ? '700' : '500';
             sprite.material.depthTest = false;
             sprite.renderOrder = 1000;
             sprite.position.y = radius + 5;
