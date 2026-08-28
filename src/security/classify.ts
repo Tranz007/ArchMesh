@@ -1,3 +1,5 @@
+import type { GraphMetadata } from '../types';
+
 export type SensitiveDataCategory = 'pii' | 'credential' | 'financial' | 'identifier';
 
 export interface SensitiveFieldClassification {
@@ -72,7 +74,7 @@ export function classifySensitiveFields(fields: string[]) {
   return result;
 }
 
-export function securityMetadataForFields(fields: string[]) {
+export function securityMetadataForFields(fields: string[]): GraphMetadata {
   const classifications = classifySensitiveFields(fields);
   if (classifications.length === 0) return {};
 
@@ -83,5 +85,5 @@ export function securityMetadataForFields(fields: string[]) {
     securityDataCategories: categories.join(', '),
     securityEvidence: 'Sensitive field names detected in a statically inspectable payload.',
     securityConfidence: 'detected',
-  } as const;
+  };
 }
