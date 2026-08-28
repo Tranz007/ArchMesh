@@ -36,17 +36,50 @@
   color: #c6d0df;
   cursor: pointer;
   font-size: 10px;
+  transition: border-color .15s ease, background .15s ease, color .15s ease, box-shadow .15s ease;
 }
 
-.graph-controls button:hover {
+.graph-controls button:hover:not(:disabled) {
   border-color: #536783;
   background: #1b2739;
   color: #eef3fb;
 }
 
+.graph-controls button.active {
+  border-color: #4f88d8;
+  background: #193154;
+  color: #e8f2ff;
+  box-shadow: 0 0 0 1px rgba(88, 166, 255, .14), 0 0 14px rgba(88, 166, 255, .12);
+}
+
+.graph-controls button.secondary {
+  min-width: 42px;
+  padding: 0 7px;
+  border-color: #303c51;
+  background: #111827;
+}
+
+.graph-controls button.secondary.active {
+  border-color: #5877a3;
+  background: #1a273a;
+}
+
+.graph-controls button:disabled {
+  cursor: not-allowed;
+  opacity: .42;
+}
+
 .graph-controls button:focus-visible {
   outline: 2px solid #86a8e0;
   outline-offset: 2px;
+}
+
+.flow-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 4px;
+  border-left: 1px solid rgba(53, 66, 90, .7);
 }
 
 .graph-controls span {
@@ -90,7 +123,13 @@
   transform: rotate(45deg);
 }
 
-@media (max-width: 680px) {
+@media (max-width: 760px) {
+  .graph-controls {
+    left: 12px;
+    right: 12px;
+    justify-content: space-between;
+  }
+
   .graph-controls span {
     display: none;
   }
