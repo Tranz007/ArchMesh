@@ -51,12 +51,16 @@ ArchMesh uses layered support. A codebase does **not** need a dedicated framewor
 
 **Deep** means ArchMesh understands important framework-specific architecture. **Structural** means the source/dependency graph is useful today but framework-specific semantics are incomplete. **Partial** means only supported JS/TS portions of the repository are currently parsed. **Planned** means the primary source language is not scanned yet.
 
-See the full [Codebase Support Matrix](docs/SUPPORT_MATRIX.md) for exact file support, known gaps, monorepo behavior, and the framework-adapter expansion plan.
+Scanner breadth is built around a versioned **language-plugin + framework-adapter** host. A language plugin contributes structural graph evidence; compatible framework adapters enrich that shared graph with routes, DI, handlers, or other framework semantics. Mixed-language repositories can eventually activate multiple parsers into one ArchMesh graph instead of requiring separate viewers.
+
+See the full [Codebase Support Matrix](docs/SUPPORT_MATRIX.md) for exact file support and gaps, and [Plugin Development](docs/PLUGIN_DEVELOPMENT.md) for the parser/adapter contract.
 
 ## Current capabilities
 
 ArchMesh is pre-1.0, but already supports a useful TypeScript/JavaScript baseline:
 
+- versioned scanner plugin host with graph-fragment merging and framework-adapter extension points;
+- built-in JavaScript/TypeScript language plugin covering `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, and `.cjs`;
 - interactive Three.js/WebGL 3D architecture graph with orbit, zoom, pan, and fit-to-view controls;
 - semantic node shapes and colors for products, features, services/APIs, routes, data, integrations, components, files, and modules;
 - Architecture Lenses for System Map, Product Areas, Data & Integrations, Routes & APIs, Security, Change Impact, Health, Architecture Drift, and Code Structure;
@@ -363,16 +367,25 @@ See [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
 Project source
       │
       ▼
- TypeScript / JS scanner
+ Language plugin host
       │
-      ├── module resolution
-      ├── Next.js semantics
-      ├── HTTP relationships + transport evidence
-      ├── Firestore relationships + field evidence
-      └── integration detection
+      ├── JavaScript / TypeScript (built in)
+      ├── Python (future)
+      ├── JVM (future)
+      └── .NET / others (future)
       │
       ▼
- Exact code graph
+ Shared source graph
+      │
+      ▼
+ Framework adapters
+      │
+      ├── Next.js semantics
+      ├── Angular / Nest / FastAPI / Spring / ASP.NET ...
+      └── platform-specific evidence
+      │
+      ▼
+ Exact ArchMesh graph
       │
       ├────────────┬────────────┬────────────┬────────────┬───────────┐
       ▼            ▼            ▼            ▼            ▼           ▼
@@ -390,7 +403,7 @@ Project source
                                optional watch loop
 ```
 
-The exact code graph remains the evidence layer. Higher-level views, traces, and comparisons are projections, not replacements for the underlying relationships.
+The exact graph remains the evidence layer. Language/framework parsers contribute to that shared contract; higher-level views, traces, and comparisons are projections rather than replacements for the underlying relationships.
 
 ## Design principles
 
@@ -402,6 +415,8 @@ The exact code graph remains the evidence layer. Higher-level views, traces, and
 
 **Unknown is not absent.** If source evidence cannot prove a runtime or provider security control, ArchMesh says Unknown rather than secure or insecure.
 
+**Extensible parsers over a monolithic scanner.** Language plugins produce structural evidence; framework adapters enrich it; all extensions converge on the same graph contract.
+
 **Progressive investigation over expansion.** Trace begins with one hop and lets the user re-root deliberately instead of expanding an arbitrary number of relationships into another hairball.
 
 **Human architecture over file hairballs.** Start with product areas and features; reveal routes, services, data, files, and source detail progressively.
@@ -412,7 +427,8 @@ The exact code graph remains the evidence layer. Higher-level views, traces, and
 
 ```text
 src/
-├── scanner/       source scanning and static semantics
+├── plugins/       language plugins, framework adapters, host/merge contracts
+├── scanner/       current JS/TS parsing and static semantics
 ├── projections/   architecture/topology/security/trace/change/drift projections
 ├── security/      conservative sensitive-data classification
 ├── health/        health signals and propagation
@@ -434,6 +450,7 @@ src/
 - [Graph model](docs/GRAPH_MODEL.md)
 - [Scanner](docs/SCANNER.md)
 - [Codebase support matrix](docs/SUPPORT_MATRIX.md)
+- [Plugin development](docs/PLUGIN_DEVELOPMENT.md)
 - [Configuration](docs/CONFIGURATION.md)
 - [Trace investigation](docs/TRACE_INVESTIGATION.md)
 - [Flow visualization](docs/FLOW_VISUALIZATION.md)
@@ -492,7 +509,7 @@ ArchMesh is independently implemented under the MIT license.
 
 ## Contributing
 
-Contributions are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`AGENTS.md`](AGENTS.md) before making changes.
+Contributions are welcome. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md), [`AGENTS.md`](AGENTS.md), and [Plugin Development](docs/PLUGIN_DEVELOPMENT.md) before extending scanner support.
 
 ## License
 
