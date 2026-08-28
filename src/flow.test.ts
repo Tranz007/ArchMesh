@@ -4,9 +4,12 @@ import {
   flowEmissionDelay,
   flowParticleSpeed,
   flowRenderEndpoints,
+  hasReverseFlow,
   isDirectionalFlowRelation,
+  mergeFlowDirection,
   shouldAnimateFlowEdge,
   startFlowEmitter,
+  withMergedFlowDirection,
 } from './flow';
 
 const callEdge = {
@@ -24,13 +27,20 @@ const dependencyEdge = {
 };
 
 describe('directional flow', () => {
-  it('only treats runtime/data relationships as animated flow', () => {
+  it('recognizes flow-capable relations without pretending a generic integration has direction', () => {
     expect(isDirectionalFlowRelation('calls')).toBe(true);
     expect(isDirectionalFlowRelation('reads')).toBe(true);
     expect(isDirectionalFlowRelation('writes')).toBe(true);
     expect(isDirectionalFlowRelation('integrates-with')).toBe(true);
     expect(isDirectionalFlowRelation('depends-on')).toBe(false);
     expect(isDirectionalFlowRelation('contains')).toBe(false);
+
+    const integration = { ...callEdge, relation: 'integrates-with' as const };
+    expect(shouldAnimateFlowEdge(integration, { enabled: true, scope: 'all' })).toBe(false);
+    expect(shouldAnimateFlowEdge(
+      { ...integration, flowDirection: 'source-to-target' },
+      { enabled: true, scope: 'all' },
+    )).toBe(true);
   });
 
   it('limits focus flow to the selected node neighborhood', () => {
@@ -62,6 +72,25 @@ describe('directional flow', () => {
       source: 'node:a',
       target: 'node:b',
     });
+  });
+
+  it('keeps bidirectional integration evidence explicit and mergeable', () => {
+    expect(mergeFlowDirection('source-to-target', 'target-to-source')).toBe('both');
+    expect(withMergedFlowDirection(
+      { flowDirection: 'source-to-target', securityTransport: 'unknown' },
+      { flowDirection: 'target-to-source' },
+    )).toEqual({
+      flowDirection: 'both',
+      securityTransport: 'unknown',
+    });
+
+    const integration = {
+      ...callEdge,
+      relation: 'integrates-with' as const,
+      flowDirection: 'both' as const,
+    };
+    expect(hasReverseFlow(integration)).toBe(true);
+    expect(flowDirectionLabel('integrates-with', 'both')).toBe('source ↔ target');
   });
 
   it('uses substantially wider randomized spacing in all-flow than focused flow', () => {
